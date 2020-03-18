@@ -732,7 +732,6 @@ index = {"subplots": "00_torch_core.ipynb",
          "pd.DataFrame.from_dicoms": "60_medical.imaging.ipynb",
          "WandbCallback": "70_callback.wandb.ipynb",
          "TensorBoardCallback": "71_callback.tensorboard.ipynb",
-<<<<<<< HEAD
          "tensorboard_log": "71_callback.tensorboard.ipynb",
          "open_npy": "80_vision.multichannel.ipynb",
          "open_geotiff": "80_vision.multichannel.ipynb",
@@ -752,9 +751,6 @@ index = {"subplots": "00_torch_core.ipynb",
          "TifSegmentationDataLoaders": "80_vision.multichannel.ipynb",
          "ScaleToFloatTensor": "80_vision.multichannel.ipynb",
          "ToVolumetric": "80_vision.multichannel.ipynb",
-=======
-         "NeptuneCallback": "72_callback.neptune.ipynb",
->>>>>>> master
          "synth_dbunch": "97_test_utils.ipynb",
          "RegModel": "97_test_utils.ipynb",
          "synth_learner": "97_test_utils.ipynb",
@@ -805,14 +801,11 @@ modules = ["torch_core.py",
            "medical/text.py",
            "callback/wandb.py",
            "callback/tensorboard.py",
-<<<<<<< HEAD
            "vision/multichannel.py",
            "test_utils.py"]
-=======
            "callback/neptune.py",
            "test_utils.py",
            "_pytorch_doc.py"]
->>>>>>> master
 
 doc_url = "https://dev.fast.ai/"
 
