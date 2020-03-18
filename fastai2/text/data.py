@@ -25,8 +25,8 @@ class LMTensorText(TensorText): pass
 # Cell
 class Numericalize(Transform):
     "Reversible transform of tokenized texts to numericalized ids"
-    def __init__(self, vocab=None, min_freq=3, max_vocab=60000, sep=' '):
-        self.vocab,self.min_freq,self.max_vocab,self.sep = vocab,min_freq,max_vocab,sep
+    def __init__(self, vocab=None, min_freq=3, max_vocab=60000):
+        store_attr(self, 'vocab,min_freq,max_vocab')
         self.o2i = None if vocab is None else defaultdict(int, {v:k for k,v in enumerate(vocab)})
 
     def setups(self, dsets):
@@ -37,7 +37,7 @@ class Numericalize(Transform):
             self.o2i = defaultdict(int, {v:k for k,v in enumerate(self.vocab) if v != 'xxfake'})
 
     def encodes(self, o): return TensorText(tensor([self.o2i  [o_] for o_ in o]))
-    def decodes(self, o): return TitledStr(self.sep.join([self.vocab[o_] for o_ in o if self.vocab[o_] != PAD]))
+    def decodes(self, o): return L(self.vocab[o_] for o_ in o if self.vocab[o_] != PAD)
 
 # Cell
 def _maybe_first(o): return o[0] if isinstance(o, tuple) else o
@@ -103,15 +103,16 @@ def truncate(self:TitledStr, n):
 @typedispatch
 def show_batch(x: TensorText, y, samples, ctxs=None, max_n=10, trunc_at=150, **kwargs):
     if ctxs is None: ctxs = get_empty_df(min(len(samples), max_n))
-    samples = L((s[0].truncate(trunc_at),*s[1:]) for s in samples)
+    if trunc_at is not None: samples = L((s[0].truncate(trunc_at),*s[1:]) for s in samples)
     ctxs = show_batch[object](x, y, samples, max_n=max_n, ctxs=ctxs, **kwargs)
     display_df(pd.DataFrame(ctxs))
     return ctxs
 
 # Cell
 @typedispatch
-def show_batch(x: LMTensorText, y, samples, ctxs=None, max_n=10, **kwargs):
-    return show_batch[TensorText](x, None, samples, ctxs=ctxs, max_n=max_n, **kwargs)
+def show_batch(x: LMTensorText, y, samples, ctxs=None, max_n=10, trunc_at=150, **kwargs):
+    samples = L((s[0].truncate(trunc_at), s[1].truncate(trunc_at)) for s in samples)
+    return show_batch[TensorText](x, None, samples, ctxs=ctxs, max_n=max_n, trunc_at=None, **kwargs)
 
 # Cell
 def pad_input(samples, pad_idx=1, pad_fields=0, pad_first=False, backwards=False):
@@ -136,7 +137,7 @@ def pad_input_chunk(samples, pad_idx=1, pad_first=True, seq_len=72):
         l = max_len - x.shape[0]
         pad_chunk = x.new_zeros((l//seq_len) * seq_len) + pad_idx
         pad_res   = x.new_zeros(l % seq_len) + pad_idx
-        x1 = torch.cat([pad_chunk, x, pad_res]) if pad_first else torch.cat([pad_res, x, pad_chunk])
+        x1 = torch.cat([pad_chunk, x, pad_res]) if pad_first else torch.cat([x, pad_res, pad_chunk])
         return retain_type(x1, x)
     return [(_f(s[0]), *s[1:]) for s in samples]
 
@@ -150,7 +151,7 @@ class SortedDL(TfmdDL):
         self.sort_func = _default_sort if sort_func is None else sort_func
         if res is None and self.sort_func == _default_sort: res = _get_lengths(dataset)
         self.res = [self.sort_func(self.do_item(i)) for i in range_of(self.dataset)] if res is None else res
-        self.idx_max = np.argmax(self.res)
+        if len(self.res) > 0: self.idx_max = np.argmax(self.res)
 
     def get_idxs(self):
         idxs = super().get_idxs()
@@ -179,20 +180,23 @@ class SortedDL(TfmdDL):
 
 # Cell
 class TextBlock(TransformBlock):
-    def __init__(self, tok_tfm, vocab=None, is_lm=False, seq_len=72):
-        return super().__init__(type_tfms=[tok_tfm, Numericalize(vocab)],
+    @delegates(Numericalize.__init__)
+    def __init__(self, tok_tfm, vocab=None, is_lm=False, seq_len=72, **kwargs):
+        return super().__init__(type_tfms=[tok_tfm, Numericalize(vocab, **kwargs)],
                                 dl_type=LMDataLoader if is_lm else SortedDL,
                                 dls_kwargs={} if is_lm else {'before_batch': partial(pad_input_chunk, seq_len=seq_len)})
 
     @classmethod
     @delegates(Tokenizer.from_df, keep=True)
-    def from_df(cls, text_cols, vocab=None, is_lm=False, seq_len=72, **kwargs):
-        return cls(Tokenizer.from_df(text_cols, **kwargs), vocab=vocab, is_lm=is_lm, seq_len=seq_len)
+    def from_df(cls, text_cols, vocab=None, is_lm=False, seq_len=72, min_freq=3, max_vocab=60000, **kwargs):
+        return cls(Tokenizer.from_df(text_cols, **kwargs), vocab=vocab, is_lm=is_lm, seq_len=seq_len,
+                   min_freq=min_freq, max_vocab=max_vocab)
 
     @classmethod
     @delegates(Tokenizer.from_folder, keep=True)
-    def from_folder(cls, path, vocab=None, is_lm=False, seq_len=72, **kwargs):
-        return cls(Tokenizer.from_folder(path, **kwargs), vocab=vocab, is_lm=is_lm, seq_len=seq_len)
+    def from_folder(cls, path, vocab=None, is_lm=False, seq_len=72, min_freq=3, max_vocab=60000, **kwargs):
+        return cls(Tokenizer.from_folder(path, **kwargs), vocab=vocab, is_lm=is_lm, seq_len=seq_len,
+                   min_freq=min_freq, max_vocab=max_vocab)
 
 # Cell
 class TextDataLoaders(DataLoaders):

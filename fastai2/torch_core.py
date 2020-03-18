@@ -26,8 +26,8 @@ if torch.cuda.is_available():
 
 # Cell
 @delegates(plt.subplots, keep=True)
-def subplots(nrows=1, ncols=1, figsize=None, imsize=4, **kwargs):
-    if figsize is None: figsize=(imsize*ncols,imsize*nrows)
+def subplots(nrows=1, ncols=1, figsize=None, imsize=3, add_vert=0, **kwargs):
+    if figsize is None: figsize=(ncols*imsize, nrows*imsize+add_vert)
     fig,ax = plt.subplots(nrows, ncols, figsize=figsize, **kwargs)
     if nrows*ncols==1: ax = array([ax])
     return fig,ax
@@ -211,7 +211,7 @@ def to_np(x):
 def to_concat(xs, dim=0):
     "Concat the element in `xs` (recursively if they are tuples/lists of tensors)"
     if is_listy(xs[0]): return type(xs[0])([to_concat([x[i] for x in xs], dim=dim) for i in range_of(xs[0])])
-    if isinstance(xs[0],dict):  return {k: to_concat([x[k] for x in xs], dim=dim) for k in xs.keys()}
+    if isinstance(xs[0],dict):  return {k: to_concat([x[k] for x in xs], dim=dim) for k in xs[0].keys()}
     #We may receives xs that are not concatenatable (inputs of a text classifier for instance),
     #   in this case we return a big list
     try:    return retain_type(torch.cat(xs, dim=dim), xs[0])
@@ -758,7 +758,7 @@ def grad_module(cls):
         def forward(self, *args, **kwargs): return cls.apply(*args, **kwargs)
     return _c
 
-# Comes from 13a_metrics.ipynb, cell
+# Comes from 13b_metrics.ipynb, cell
 def flatten_check(inp, targ):
     "Check that `out` and `targ` have the same number of elements and flatten them."
     inp,targ = inp.contiguous().view(-1),targ.contiguous().view(-1)

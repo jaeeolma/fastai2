@@ -6,6 +6,7 @@ keywords: fastai
 sidebar: home_sidebar
 
 summary: "High level API to quickly get your data in a `DataLoaders`"
+description: "High level API to quickly get your data in a `DataLoaders`"
 ---
 <!--
 
@@ -137,7 +138,7 @@ summary: "High level API to quickly get your data in a `DataLoaders`"
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="General-API">General API<a class="anchor-link" href="#General-API">&#182;</a></h2>
+<h2 id="General-API">General API<a class="anchor-link" href="#General-API"> </a></h2>
 </div>
 </div>
 </div>
@@ -203,7 +204,7 @@ summary: "High level API to quickly get your data in a `DataLoaders`"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="DataBlock.datasets" class="doc_header"><code>DataBlock.datasets</code><a href="https://github.com/fastai/fastai2/tree/master/fastai2/data/block.py#L89" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>DataBlock.datasets</code>(<strong><code>source</code></strong>, <strong><code>verbose</code></strong>=<em><code>False</code></em>)</p>
+<h4 id="DataBlock.datasets" class="doc_header"><code>DataBlock.datasets</code><a href="https://github.com/fastai/fastai2/tree/master/fastai2/data/block.py#L90" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>DataBlock.datasets</code>(<strong><code>source</code></strong>, <strong><code>verbose</code></strong>=<em><code>False</code></em>)</p>
 </blockquote>
 <p>Create a <a href="/data.core#Datasets"><code>Datasets</code></a> object from <code>source</code></p>
 
@@ -224,7 +225,7 @@ summary: "High level API to quickly get your data in a `DataLoaders`"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="DataBlock.dataloaders" class="doc_header"><code>DataBlock.dataloaders</code><a href="https://github.com/fastai/fastai2/tree/master/fastai2/data/block.py#L96" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>DataBlock.dataloaders</code>(<strong><code>source</code></strong>, <strong><code>path</code></strong>=<em><code>'.'</code></em>, <strong><code>verbose</code></strong>=<em><code>False</code></em>, <strong><code>bs</code></strong>=<em><code>64</code></em>, <strong><code>shuffle</code></strong>=<em><code>False</code></em>, <strong><code>num_workers</code></strong>=<em><code>None</code></em>, <strong><code>do_setup</code></strong>=<em><code>True</code></em>, <strong><code>pin_memory</code></strong>=<em><code>False</code></em>, <strong><code>timeout</code></strong>=<em><code>0</code></em>, <strong><code>batch_size</code></strong>=<em><code>None</code></em>, <strong><code>drop_last</code></strong>=<em><code>False</code></em>, <strong><code>indexed</code></strong>=<em><code>None</code></em>, <strong><code>n</code></strong>=<em><code>None</code></em>, <strong><code>device</code></strong>=<em><code>None</code></em>, <strong><code>wif</code></strong>=<em><code>None</code></em>, <strong><code>before_iter</code></strong>=<em><code>None</code></em>, <strong><code>after_item</code></strong>=<em><code>None</code></em>, <strong><code>before_batch</code></strong>=<em><code>None</code></em>, <strong><code>after_batch</code></strong>=<em><code>None</code></em>, <strong><code>after_iter</code></strong>=<em><code>None</code></em>, <strong><code>create_batches</code></strong>=<em><code>None</code></em>, <strong><code>create_item</code></strong>=<em><code>None</code></em>, <strong><code>create_batch</code></strong>=<em><code>None</code></em>, <strong><code>retain</code></strong>=<em><code>None</code></em>, <strong><code>get_idxs</code></strong>=<em><code>None</code></em>, <strong><code>sample</code></strong>=<em><code>None</code></em>, <strong><code>shuffle_fn</code></strong>=<em><code>None</code></em>, <strong><code>do_batch</code></strong>=<em><code>None</code></em>)</p>
+<h4 id="DataBlock.dataloaders" class="doc_header"><code>DataBlock.dataloaders</code><a href="https://github.com/fastai/fastai2/tree/master/fastai2/data/block.py#L97" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>DataBlock.dataloaders</code>(<strong><code>source</code></strong>, <strong><code>path</code></strong>=<em><code>'.'</code></em>, <strong><code>verbose</code></strong>=<em><code>False</code></em>, <strong><code>bs</code></strong>=<em><code>64</code></em>, <strong><code>shuffle</code></strong>=<em><code>False</code></em>, <strong><code>num_workers</code></strong>=<em><code>None</code></em>, <strong><code>do_setup</code></strong>=<em><code>True</code></em>, <strong><code>pin_memory</code></strong>=<em><code>False</code></em>, <strong><code>timeout</code></strong>=<em><code>0</code></em>, <strong><code>batch_size</code></strong>=<em><code>None</code></em>, <strong><code>drop_last</code></strong>=<em><code>False</code></em>, <strong><code>indexed</code></strong>=<em><code>None</code></em>, <strong><code>n</code></strong>=<em><code>None</code></em>, <strong><code>device</code></strong>=<em><code>None</code></em>, <strong><code>wif</code></strong>=<em><code>None</code></em>, <strong><code>before_iter</code></strong>=<em><code>None</code></em>, <strong><code>after_item</code></strong>=<em><code>None</code></em>, <strong><code>before_batch</code></strong>=<em><code>None</code></em>, <strong><code>after_batch</code></strong>=<em><code>None</code></em>, <strong><code>after_iter</code></strong>=<em><code>None</code></em>, <strong><code>create_batches</code></strong>=<em><code>None</code></em>, <strong><code>create_item</code></strong>=<em><code>None</code></em>, <strong><code>create_batch</code></strong>=<em><code>None</code></em>, <strong><code>retain</code></strong>=<em><code>None</code></em>, <strong><code>get_idxs</code></strong>=<em><code>None</code></em>, <strong><code>sample</code></strong>=<em><code>None</code></em>, <strong><code>shuffle_fn</code></strong>=<em><code>None</code></em>, <strong><code>do_batch</code></strong>=<em><code>None</code></em>)</p>
 </blockquote>
 <p>Create a <a href="/data.core#DataLoaders"><code>DataLoaders</code></a> object from <code>source</code></p>
 
@@ -312,7 +313,7 @@ summary: "High level API to quickly get your data in a `DataLoaders`"
 
 
 <div class="output_png output_subarea ">
-<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHsAAACLCAYAAABBVeZmAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAADh0RVh0U29mdHdhcmUAbWF0cGxvdGxpYiB2ZXJzaW9uMy4xLjEsIGh0dHA6Ly9tYXRwbG90bGliLm9yZy8QZhcZAAAE3klEQVR4nO2dTyh0axzHf4/srpAkpRQJCTvkioQsbBSykO4srGSDsvRnIVvq9a+s2Chyy07dEq5YKSlFKVnpXlLcu7DAuav3NL/nvWbMOzPnnJnv91PqfJs508On3/l5znPOGeM4jhAMMvweAPEOygaCsoGgbCAoGwjKBoKygYCSbYz51/p5N8Z883tcXpHp9wC8xHGcrO/bxphfROQvEdn2b0TeAlXZFn0i8reI/On3QLwCWXZIRDYcoPPFBuh3dTHGFIvIrYiUOY5z6/d4vAK1sn8TkWMk0SLYstf9HoTXwB3GjTG/isgfIlLoOM4/fo/HSxArOyQiv6OJFgGsbGQQKxsWygaCsoGgbCAoG4hoq178Vz31MJ+9wMoGgrKBoGwgKBsIygaCsoGgbCAoGwjKBoKygaBsICgbCMoGgrKBoGwgKBsIygaCsoGgbCAoGwjKBoKygaBsICgbCMoGgrKBSNmH3r29val8fn6ucn19vcoFBQXu9sTEhHrt+vpa5bW1NZXb2tpU7urqim2wFrW1tSq3t7e72xkZyas/VjYQlA0EZQMR7QE6gbll9/n5WeWRkRGVNzc3vRxOQnl4eHC38/Ly4v043rJLKBsKygYisPPs19dXlZubm1W+vLyM6fNmZmbc7c7OzojvXVxcVPn09FTl29v4nm+bn5+vcmamNxpY2UBQNhCUDURgerbdo4eHh1WO1qON0dPLoaEhlcfGxtztrKwsiURDQ4PKLy8vKu/v76vc29sb8fNsenp6VM7Ozo5p/5+FlQ0EZQNB2UAE5tz43d2dyqWlpTHt39TUpPLR0VHcY/rOwcGByoODgyrf399H3L+oqEjlw8NDlUtKSn5+cD/Cc+OEsqGgbCACM8/Ozc1VORQKqby+rr+GK3zeLCIyOzubnIGJyO7ursrRerTN1taWygnu0V+GlQ0EZQNB2UAEZp5t8/HxobJ9nbh9fXU8a8L232B6elrlubm5iO+3mZycVHlqakrlZF4bLpxnExHKhiKwh/Fk8v7+rrJ9arWjoyPi/vZyaktLi8r2EqjH8DBOKBsKygYCsmff3NyoXFFREdP+ZWVlKtu3/PoMezahbCgoG4jALHEmm8fHR3d7ZWUlpn2Li4tVPj4+TsiYvIaVDQRlA0HZQKTtPNteEh0YGHC3d3Z2Iu5rXzZk9+jCwsI4R5dUOM8mlA0FZQORNvNs+zKm8fFxlaP16XD29vZUDniP/jKsbCAoGwjKBiJtevb29rbKS0tLn77XPte9sLCgcqy3C6cKrGwgKBsIygYiZXu23aPDz31Ho66uTuXu7u6EjCnosLKBoGwgKBuIlFnPvrq6UrmxsVFl+5GTNqOjo+62fUut/YiPFIfr2YSyoaBsIALbs+1HTre2tqr89PQUcf+amhqVwx9JmWY92oY9m1A2FJQNRGB6dvhXFIqIVFdXqxx+r9b/UVlZqfLJyYnKOTk5cYwupWDPJpQNRWCWOJeXl1WOdtiuqqpSeXV1VWWgw/aXYWUDQdlAUDYQvvXss7Mzlefn52Pav6+vT2X723/Ij7CygaBsICgbCN96dnl5ucr2oy0uLi5U3tjYULm/vz85A0tjWNlAUDYQlA1EYJY4ScLgEiehbCgoG4ho8+xPj/8k9WBlA0HZQFA2EJQNBGUDQdlA/AdDRSN/yb0OvgAAAABJRU5ErkJggg==
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHsAAACLCAYAAABBVeZmAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAALEgAACxIB0t1+/AAAADh0RVh0U29mdHdhcmUAbWF0cGxvdGxpYiB2ZXJzaW9uMy4xLjEsIGh0dHA6Ly9tYXRwbG90bGliLm9yZy8QZhcZAAAEtklEQVR4nO2dTyhsfRjHn9/Nwv+sZCEkC0oKG91sWEhk90qSezdK5N9GEUmWiHQ3yp9yd1Jvsn1Z8N4UZSHCyt0iSd2bJJy7uXe6zylnzMyZc+bM9/spNd/mzG8ePj3zzJzjzDGWZQnB4IPfBRDvoGwgKBsIygaCsoGgbCAoGwgo2caYn7afF2PMF7/r8ooUvwvwEsuyMv/cNsZkiMi1iGz4V5G3QHW2jX9E5EZE/ve7EK9Alv1ZRL5aQPuLDdDvGsIYUyAi30WkxLKs737X4xWonf1JRL4hiRbBlr3mdxFeA/cyboz5KCL/iUieZVk//K7HSxA7+7OI/IsmWgSws5FB7GxYKBsIygaCsoGgbCDCHfXiW/XgYd66g50NBGUDQdlAUDYQlA0EZQNB2UBQNhCUDQRlA0HZQFA2EJQNBGUDQdlAUDYQlA0EZQNB2UBQNhCUDQRlAwH1BTpvsbe3p/LAwIDKx8fHKre2tqq8saG/g2dra0vllpaWWEt0BXY2EJQNBGUDEe5k/KQ5/efvuWyfyScnJyrH+gUF/f39Ki8sLMS0XoTw9B9C2VBQNhBJO7MXFxdV7uvrC91+fX2N63Pn5uaqfHV1Fdfns8GZTSgbCsoGIrD7xu/u7lRuaGhQ2b4/22lO5+XlqdzV1eX43Jubmyqfnp46bp8osLOBoGwgKBuIwMzsg4MDlZubm1W2z3AnxsbGVB4dHVU5PT3dce25uTnH9evr699di5ews4GgbCAoG4iEndnz8/MqT09PqxxuRhcUFKg8PDwcut3d3a3uS0lx/jPMzMyo/PDw4Lh9e3u74/1+wc4GgrKBoGwgfJvZt7e3Kq+urqo8Pj6u8vPzs+N6U1NTKtv/zyw7OzvSEkPc399H/dhEgp0NBGUDQdlA+Dazd3Z2VB4ZGXHcvqioSOWhoSGVe3t7VQ732dkJ+/uJ9fV1x+3T0tJULiwsjPq54wk7GwjKBiJhd5fa2d7eVrm4uNi1tR8fH1W2H/IM99GrsbFR5YqKCncKcxl2NhCUDQRlA+HbzG5qalK5s7NT5fLycpXthyzd5Pr6WuWVlZWIHt/T0+NmOXGDnQ0EZQNB2UD4NrOzsrJUXltb86kSkeXl5Yi2z8/PV7mmpsbNcuIGOxsIygaCsoEIzL5xN7GfYru0tBTR4zMyMlTOzMyMuSYvYGcDQdlAUDYQkDN7cnJS5ZubG8ftU1NTVZ6YmHC7JE9gZwNB2UBQNhBJO7Ofnp5UPj8/D93e39+PaK3Z2VmVE/WU3HCws4GgbCAoG4ikndkXFxcqV1ZWRr1WVVVVrOUkBOxsICgbCMoGImlndrjTbJ2orq5WubS0NNZyEgJ2NhCUDQRlA5E0l3q6vLxUuba2VmWnyy2VlJSofHh4qHJOTk6M1XkKL/VEKBsKygYisJ+zX15eVG5ra1M5kksiDg4OqhywGf1u2NlAUDYQgXkZt19xz/71VUdHR+9eq6ysTOWOjo7oCwsQ7GwgKBsIygYiMLtLd3d3Va6rq4t6rbOzM5WT5RDmb7i7lFA2FJQNRGBmNnk3nNmEsqGgbCAoGwjKBoKygaBsIMIdz37zMxsJHuxsICgbCMoGgrKBoGwgKBuIX2IkA3PEYWLsAAAAAElFTkSuQmCC
 "
 >
 </div>
@@ -338,7 +339,7 @@ summary: "High level API to quickly get your data in a `DataLoaders`"
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h2 id="Debugging">Debugging<a class="anchor-link" href="#Debugging">&#182;</a></h2>
+<h2 id="Debugging">Debugging<a class="anchor-link" href="#Debugging"> </a></h2>
 </div>
 </div>
 </div>
@@ -363,7 +364,7 @@ summary: "High level API to quickly get your data in a `DataLoaders`"
 
 
 <div class="output_markdown rendered_html output_subarea ">
-<h4 id="DataBlock.summary" class="doc_header"><code>DataBlock.summary</code><a href="https://github.com/fastai/fastai2/tree/master/fastai2/data/block.py#L140" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>DataBlock.summary</code>(<strong><code>source</code></strong>, <strong><code>bs</code></strong>=<em><code>4</code></em>, <strong>**<code>kwargs</code></strong>)</p>
+<h4 id="DataBlock.summary" class="doc_header"><code>DataBlock.summary</code><a href="https://github.com/fastai/fastai2/tree/master/fastai2/data/block.py#L141" class="source_link" style="float:right">[source]</a></h4><blockquote><p><code>DataBlock.summary</code>(<strong><code>source</code></strong>, <strong><code>bs</code></strong>=<em><code>4</code></em>, <strong>**<code>kwargs</code></strong>)</p>
 </blockquote>
 
 </div>
