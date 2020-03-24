@@ -102,7 +102,7 @@ class _TabIloc:
 class Tabular(CollBase, GetAttr, FilteredBase):
     "A `DataFrame` wrapper that knows which cols are cont/cat/y, and returns rows in `__getitem__`"
     _default,with_cont='procs',True
-    def __init__(self, df, procs=None, cat_names=None, cont_names=None, y_names=None, block_y=None, splits=None,
+    def __init__(self, df, procs=None, cat_names=None, cont_names=None, y_names=None, y_block=None, splits=None,
                  do_setup=True, device=None, inplace=False, reduce_memory=True):
         if inplace and splits is not None and pd.options.mode.chained_assignment is not None:
             warn("Using inplace with splits will trigger a pandas error. Set `pd.options.mode.chained_assignment=None` to avoid it.")
@@ -112,28 +112,30 @@ class Tabular(CollBase, GetAttr, FilteredBase):
         super().__init__(df)
 
         self.y_names,self.device = L(y_names),device
-        if block_y is None and self.y_names:
+        if y_block is None and self.y_names:
             # Make ys categorical if they're not numeric
             ys = df[self.y_names]
-            if len(ys.select_dtypes(include='number').columns)!=len(ys.columns): block_y = CategoryBlock()
-            else: block_y = RegressionBlock()
-        if block_y is not None and do_setup:
-            if callable(block_y): block_y = block_y()
-            procs = L(procs) + block_y.type_tfms
+            if len(ys.select_dtypes(include='number').columns)!=len(ys.columns): y_block = CategoryBlock()
+            else: y_block = RegressionBlock()
+        if y_block is not None and do_setup:
+            if callable(y_block): y_block = y_block()
+            procs = L(procs) + y_block.type_tfms
         self.cat_names,self.cont_names,self.procs = L(cat_names),L(cont_names),Pipeline(procs)
         self.split = len(df) if splits is None else len(splits[0])
-        if reduce_memory: self.reduce_cats(), self.reduce_conts()
+        if reduce_memory:
+            if len(self.cat_names) > 0: self.reduce_cats()
+            if len(self.cont_names) > 0: self.reduce_conts()
         if do_setup: self.setup()
 
     def new(self, df):
-        return type(self)(df, do_setup=False, reduce_memory=False, block_y=TransformBlock(),
+        return type(self)(df, do_setup=False, reduce_memory=False, y_block=TransformBlock(),
                           **attrdict(self, 'procs','cat_names','cont_names','y_names', 'device'))
 
     def subset(self, i): return self.new(self.items[slice(0,self.split) if i==0 else slice(self.split,len(self))])
     def copy(self): self.items = self.items.copy(); return self
     def decode(self): return self.procs.decode(self)
     def decode_row(self, row): return self.new(pd.DataFrame(row).T).decode().items.iloc[0]
-    def reduce_cats(self): self[self.cat_names] = self[self.cat_names].astype('category')
+    def reduce_cats(self): self.train[self.cat_names] = self.train[self.cat_names].astype('category')
     def reduce_conts(self): self[self.cont_names] = self[self.cont_names].astype(np.float32)
     def show(self, max_n=10, **kwargs): display_df(self.new(self.all_cols[:max_n]).decode().items)
     def setup(self): self.procs.setup(self)

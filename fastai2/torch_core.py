@@ -63,11 +63,11 @@ def show_titled_image(o, **kwargs):
 
 # Cell
 @delegates(subplots)
-def show_images(ims, rows=1, titles=None, **kwargs):
+def show_images(ims, nrows=1, ncols=None, titles=None, **kwargs):
     "Show all images `ims` as subplots with `rows` using `titles`"
-    cols = int(math.ceil(len(ims)/rows))
+    if ncols is None: ncols = int(math.ceil(len(ims)/nrows))
     if titles is None: titles = [None]*len(ims)
-    axs = subplots(rows,cols,**kwargs)[1].flat
+    axs = subplots(nrows, ncols, **kwargs)[1].flat
     for im,t,ax in zip(ims, titles, axs): show_image(im, ax=ax, title=t)
 
 # Cell
@@ -420,6 +420,13 @@ class TitledTuple(Tuple, ShowTitle):
 
 add_docs(TitledInt, "An `int` with `show`"); add_docs(TitledStr, "An `str` with `show`");
 add_docs(TitledFloat, "A `float` with `show`"); add_docs(TitledTuple, "A `Tuple` with `show`")
+
+# Cell
+@patch
+def truncate(self:TitledStr, n):
+    "Truncate self to `n`"
+    words = self.split(' ')[:n]
+    return TitledStr(' '.join(words))
 
 # Cell
 if not hasattr(pd.DataFrame,'_old_init'): pd.DataFrame._old_init = pd.DataFrame.__init__
