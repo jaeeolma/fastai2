@@ -124,7 +124,7 @@ def FBeta(beta, axis=-1, labels=None, pos_label=1, average='binary', sample_weig
 
 # Cell
 def HammingLoss(axis=-1, sample_weight=None):
-    "Cohen kappa for single-label classification problems"
+    "Hamming loss for single-label classification problems"
     return skm_to_fastai(skm.hamming_loss, axis=axis,
                          sample_weight=sample_weight)
 
