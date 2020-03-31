@@ -208,12 +208,14 @@ class TfmdLists(FilteredBase, L, GetAttr):
         if isinstance(tfms,TfmdLists): tfms = tfms.tfms
         if isinstance(tfms,Pipeline): do_setup=False
         self.tfms = Pipeline(tfms, split_idx=split_idx)
-        self.types = types
+        store_attr(self, 'types,split_idx')
         if do_setup:
             pv(f"Setting up {self.tfms}", verbose)
             self.setup(train_setup=train_setup)
 
-    def _new(self, items, **kwargs): return super()._new(items, tfms=self.tfms, do_setup=False, types=self.types, **kwargs)
+    def _new(self, items, split_idx=None, **kwargs):
+        split_idx = ifnone(split_idx,self.split_idx)
+        return super()._new(items, tfms=self.tfms, do_setup=False, types=self.types, split_idx=split_idx, **kwargs)
     def subset(self, i): return self._new(self._get(self.splits[i]), split_idx=i)
     def _after_item(self, o): return self.tfms(o)
     def __repr__(self): return f"{self.__class__.__name__}: {self.items}\ntfms - {self.tfms.fs}"
@@ -272,7 +274,7 @@ class Datasets(FilteredBase):
     def __init__(self, items=None, tfms=None, tls=None, n_inp=None, dl_type=None, **kwargs):
         super().__init__(dl_type=dl_type)
         self.tls = L(tls if tls else [TfmdLists(items, t, **kwargs) for t in L(ifnone(tfms,[None]))])
-        self.n_inp = (1 if len(self.tls)==1 else len(self.tls)-1) if n_inp is None else n_inp
+        self.n_inp = ifnone(n_inp, max(1, len(self.tls)-1))
 
     def __getitem__(self, it):
         res = tuple([tl[it] for tl in self.tls])

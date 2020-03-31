@@ -27,11 +27,14 @@ entries:
         - output: web,pdf
           title: Tabular tutorial
           url: /tutorial.tabular
+        - output: web,pdf
+          title: Collab tutorial
+          url: /tutorial.collab
         title: Beginners
       - output: web
         subfolderitems:
         - output: web,pdf
-          title: Data block examples
+          title: Data block tutorial
           url: /tutorial.datablock
         - output: web,pdf
           title: Imagenette tutorial
