@@ -10,12 +10,7 @@ from .hook import total_params
 
 # Cell
 import wandb
-
-# Cell
-def _try_set(d:dict, key, val):
-    "try to set wandb config key if val is available"
-    try: d[key]=val
-    except: print(f'Could not set wandb config "{key}"')
+from wandb.wandb_config import ConfigError
 
 # Cell
 class WandbCallback(Callback):
@@ -29,7 +24,7 @@ class WandbCallback(Callback):
         if wandb.run is None:
             raise ValueError('You must call wandb.init() before WandbCallback()')
         # W&B log step
-        self._wandb_step = wandb.run.step  # 0 except if the run has previously logged data
+        self._wandb_step = wandb.run.step - 1  # -1 except if the run has previously logged data (incremented at each batch)
         self._wandb_epoch = 0 if not(wandb.run.step) else math.ceil(wandb.run.summary['epoch']) # continue to next epoch
         store_attr(self, 'log,log_preds,valid_dl,n_preds,seed')
 
@@ -39,7 +34,23 @@ class WandbCallback(Callback):
         if not self.run: return
 
         # Log config parameters
-        self._log_config()
+        log_config = self.learn.gather_args()
+        for k,v in log_config.items():
+            if callable(v) and hasattr(v,'__qualname__') and hasattr(v,'__module__'): v = f'{v.__module__}.{v.__qualname__}'
+            try:
+                wandb.config[k] = v
+            except ConfigError:
+                # parameter already set manually or from previous `fit` -> do not overwrite
+                pass
+            except:
+                try:
+                    # maybe type not supported
+                    wandb.config.update({k:str(v)}, allow_val_change=True)
+                except:
+                    # just remove the parameter if it exists to let config sync
+                    wandb.config._items.pop(k, None)
+                    print(f"Unexpected error while setting wandb.config['{k}']")
+        #wandb.config.update({})
 
         if not WandbCallback._wandb_watch_called:
             WandbCallback._wandb_watch_called = True
@@ -83,36 +94,7 @@ class WandbCallback(Callback):
     def after_fit(self):
         self.run = True
         if self.log_preds: self.remove_cb(self.learn.fetch_preds)
-
-    def _log_config(self):
-        "Log configuration parameters"
-        config={}
-
-        # log callbacks
-        try: config={f'{cb}':True for cb in self.cbs}
-        except: print(f'Could not set wandb config callbacks')
-
-        # log input dimensions
-        try:
-            xb = self.dls.train.one_batch()[:self.dls.train.n_inp]
-            config.update({f'input dim {i}':d for i,d in enumerate(list(detuplify(xb).shape))})
-        except: print(f'Could not set wandb config input dimensions')
-        _try_set(config, 'batch size', self.dls.bs)
-        _try_set(config, 'batch per epoch', len(self.dls.train))
-        _try_set(config, 'model', self.model.__class__.__name__)
-        _try_set(config, 'model parameters', total_params(self.model)[0])
-        _try_set(config, 'loss function', f'{self.loss_func}')
-        _try_set(config, 'device', self.dls.device.type)
-        _try_set(config, 'optimizer', self.opt_func.__name__)
-        _try_set(config, 'frozen', bool(self.opt.frozen_idx))
-        _try_set(config, 'frozen idx', self.opt.frozen_idx)
-        _try_set(config, 'dataset.tfms', f'{self.dls.dataset.tfms}')
-        _try_set(config, 'dls.after_item', f'{self.dls.after_item}')
-        _try_set(config, 'dls.before_batch', f'{self.dls.before_batch}')
-        _try_set(config, 'dls.after_batch', f'{self.dls.after_batch}')
-
-        wandb.config.update(config, allow_val_change=True) # in case callback runs multiple times
-
+        wandb.log({}) # ensure sync of last step
 
 # Cell
 def _make_plt(img):

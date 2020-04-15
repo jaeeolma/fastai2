@@ -451,6 +451,7 @@ description: "Functions for getting, splitting, and labeling data, as well as ge
 <div class=" highlight hl-ipython3"><pre><span></span><span class="n">test_eq</span><span class="p">(</span><span class="n">ItemGetter</span><span class="p">(</span><span class="mi">1</span><span class="p">)((</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">)),</span>  <span class="mi">2</span><span class="p">)</span>
 <span class="n">test_eq</span><span class="p">(</span><span class="n">ItemGetter</span><span class="p">(</span><span class="mi">1</span><span class="p">)(</span><span class="n">L</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">)),</span> <span class="mi">2</span><span class="p">)</span>
 <span class="n">test_eq</span><span class="p">(</span><span class="n">ItemGetter</span><span class="p">(</span><span class="mi">1</span><span class="p">)([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">]),</span>  <span class="mi">2</span><span class="p">)</span>
+<span class="n">test_eq</span><span class="p">(</span><span class="n">ItemGetter</span><span class="p">(</span><span class="mi">1</span><span class="p">)(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">3</span><span class="p">])),</span>  <span class="mi">2</span><span class="p">)</span>
 </pre></div>
 
     </div>
@@ -2037,6 +2038,20 @@ errors defaults to 'strict'.</p>
 </pre></div>
 
     </div>
+</div>
+</div>
+
+<div class="output_wrapper">
+<div class="output">
+
+<div class="output_area">
+
+<div class="output_subarea output_stream output_stderr output_text">
+<pre>/opt/conda/conda-bld/pytorch_1585984269458/work/aten/src/ATen/native/BinaryOps.cpp:66: UserWarning: Integer division of tensors using div or / is deprecated, and in a future release div will perform true division as in Python 3. Use true_divide or floor_divide (// in Python) instead.
+</pre>
+</div>
+</div>
+
 </div>
 </div>
 

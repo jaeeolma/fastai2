@@ -790,7 +790,7 @@ description: "A dive into the layered API of fastai in computer vision"
 <p>This way, when you have a <code>Transform</code> like resize, you can apply it on a tuple (image, label) and it will resize the image but not the categorical label (since there is no implementation of resize for categories). The exact same transform applied on a tuple (image, mask) will resize the image and the target, using bilinear interpolation on the image and nearest neighbor on the mask. This is how the library manages to always apply data augmentation transforms on every computer vision application (segmentation, point localization or object detection).</p>
 <p>Aditionnaly, a transform can have</p>
 <ul>
-<li>a setup executed on the whole se (or the whole training set). This is how <a href="/data.transforms#Categorize"><code>Categorize</code></a> builds it vocabulary automatically.</li>
+<li>a setup executed on the whole set (or the whole training set). This is how <a href="/data.transforms#Categorize"><code>Categorize</code></a> builds it vocabulary automatically.</li>
 <li>a decodes that can undo what the transform does for showing purposes (for instance <a href="/data.transforms#Categorize"><code>Categorize</code></a> will convert back an index into a category).</li>
 </ul>
 <p>We won't delve into those bits of the low API here, but you can check out the <a href="http://dev.fast.ai/tutorial.pets">pets tutorial</a> or the more advanced <a href="http://dev.fast.ai/tutorial.siamese">siamese tutorial</a> for more information.</p>
@@ -2058,6 +2058,23 @@ description: "A dive into the layered API of fastai in computer vision"
 </div>
 </div>
 </div>
+    {% raw %}
+    
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">torch.distributions.beta</span> <span class="kn">import</span> <span class="n">Beta</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+    {% endraw %}
+
     {% raw %}
     
 <div class="cell border-box-sizing code_cell rendered">

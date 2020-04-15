@@ -11,8 +11,11 @@ from .load import *
 @typedispatch
 def show_batch(x, y, samples, ctxs=None, max_n=9, **kwargs):
     if ctxs is None: ctxs = Inf.nones
-    for i in range_of(samples[0]):
-        ctxs = [b.show(ctx=c, **kwargs) for b,c,_ in zip(samples.itemgot(i),ctxs,range(max_n))]
+    if hasattr(samples[0], 'show'):
+        ctxs = [s.show(ctx=c, **kwargs) for s,c,_ in zip(samples,ctxs,range(max_n))]
+    else:
+        for i in range_of(samples[0]):
+            ctxs = [b.show(ctx=c, **kwargs) for b,c,_ in zip(samples.itemgot(i),ctxs,range(max_n))]
     return ctxs
 
 # Cell
@@ -29,6 +32,7 @@ def show_results(x, y, samples, outs, ctxs=None, max_n=9, **kwargs):
 _batch_tfms = ('after_item','before_batch','after_batch')
 
 # Cell
+@log_args(but_as=DataLoader.__init__)
 @delegates()
 class TfmdDL(DataLoader):
     "Transformed `DataLoader`"
@@ -86,10 +90,14 @@ class TfmdDL(DataLoader):
         if not is_listy(b): b,its = [b],L((o,) for o in its)
         return detuplify(b[:self.n_inp]),detuplify(b[self.n_inp:]),its
 
-    def show_batch(self, b=None, max_n=9, ctxs=None, show=True, **kwargs):
+    def show_batch(self, b=None, max_n=9, ctxs=None, show=True, unique=False, **kwargs):
+        if unique:
+            old_get_idxs = self.get_idxs
+            self.get_idxs = lambda: Inf.zeros
         if b is None: b = self.one_batch()
         if not show: return self._pre_show_batch(b, max_n=max_n)
         show_batch(*self._pre_show_batch(b, max_n=max_n), ctxs=ctxs, max_n=max_n, **kwargs)
+        if unique: self.get_idxs = old_get_idxs
 
     def show_results(self, b, out, max_n=9, ctxs=None, show=True, **kwargs):
         x,y,its = self.show_batch(b, max_n=max_n, show=False)
@@ -152,7 +160,7 @@ class DataLoaders(GetAttr):
             if nm in kwargs: kwargs[nm] = Pipeline(kwargs[nm])
         kwargs = merge(defaults, {k: tuplify(v, match=ds) for k,v in kwargs.items()})
         kwargs = [{k: v[i] for k,v in kwargs.items()} for i in range_of(ds)]
-        return cls(*[dl_type(d, **k) for d,k in zip(ds, kwargs)], path=path, device=device)
+        return cls(*[dl_type(d, bs=bs, **k) for d,k in zip(ds, kwargs)], path=path, device=device)
 
     @classmethod
     def from_dblock(cls, dblock, source, path='.',  bs=64, val_bs=None, shuffle_train=True, device=None, **kwargs):
@@ -308,8 +316,9 @@ class Datasets(FilteredBase):
     def set_split_idx(self, i):
         old_split_idx = self.split_idx
         for tl in self.tls: tl.tfms.split_idx = i
-        yield self
-        for tl in self.tls: tl.tfms.split_idx = old_split_idx
+        try: yield self
+        finally:
+            for tl in self.tls: tl.tfms.split_idx = old_split_idx
 
     _docs=dict(
         decode="Compose `decode` of all `tuple_tfms` then all `tfms` on `i`",
