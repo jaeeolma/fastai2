@@ -217,12 +217,12 @@ class CategoryMap(CollBase):
 class Categorize(Transform):
     "Reversible transform of category string to `vocab` id"
     loss_func,order=CrossEntropyLossFlat(),1
-    def __init__(self, vocab=None, add_na=False):
-        self.add_na = add_na
-        self.vocab = None if vocab is None else CategoryMap(vocab, add_na=add_na)
+    def __init__(self, vocab=None, sort=True, add_na=False):
+        store_attr(self, 'add_na,sort')
+        self.vocab = None if vocab is None else CategoryMap(vocab, sort=sort, add_na=add_na)
 
     def setups(self, dsets):
-        if self.vocab is None and dsets is not None: self.vocab = CategoryMap(dsets, add_na=self.add_na)
+        if self.vocab is None and dsets is not None: self.vocab = CategoryMap(dsets, sort=self.sort, add_na=self.add_na)
         self.c = len(self.vocab)
 
     def encodes(self, o): return TensorCategory(self.vocab.o2i[o])
@@ -278,9 +278,10 @@ class EncodedMultiCategorize(Categorize):
 # Cell
 class RegressionSetup(Transform):
     "Transform that floatifies targets"
+    loss_func=MSELossFlat()
     def __init__(self, c=None): self.c = c
     def encodes(self, o): return tensor(o).float()
-    def decodes(self, o): return TitledFloat(o)
+    def decodes(self, o): return TitledFloat(o) if o.ndim==0 else TitledTuple(o_.item() for o_ in o)
     def setups(self, dsets):
         if self.c is not None: return
         try: self.c = len(dsets[0]) if hasattr(dsets[0], '__len__') else 1
@@ -306,7 +307,7 @@ class IntToFloatTensor(Transform):
     order = 10 #Need to run after PIL transforms on the GPU
     def __init__(self, div=255., div_mask=1): store_attr(self, 'div,div_mask')
     def encodes(self, o:TensorImage): return o.float().div_(self.div)
-    def encodes(self, o:TensorMask ): return o.div_(self.div_mask).long()
+    def encodes(self, o:TensorMask ): return o.long() // self.div_mask
     def decodes(self, o:TensorImage): return ((o.clamp(0., 1.) * self.div).long()) if self.div else o
 
 # Cell
