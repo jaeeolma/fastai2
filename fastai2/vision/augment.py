@@ -259,11 +259,12 @@ class RandomResizedCrop(RandTransform):
 # Cell
 class RatioResize(Transform):
     'Resizes the biggest dimension of an image to `max_sz` maintaining the aspect ratio'
+    order = 1
     def __init__(self, max_sz, resamples=(Image.BILINEAR, Image.NEAREST)):
         self.max_sz,self.resamples = max_sz,resamples
 
     def encodes(self, x:(Image.Image,TensorBBox,TensorPoint)):
-        w,h = x.size
+        w,h = _get_sz(x)
         if w >= h: nw,nh = self.max_sz,h*self.max_sz/w
         else:      nw,nh = w*self.max_sz/h,self.max_sz
         return Resize(size=(int(nh),int(nw)), resamples=self.resamples)(x)
@@ -583,8 +584,9 @@ def apply_perspective(coords, coeffs):
     sz = coords.shape
     coords = coords.view(sz[0], -1, 2)
     coeffs = torch.cat([coeffs, t1(coeffs[:,:1])], dim=1).view(coeffs.shape[0], 3,3)
-    coords = coords @ coeffs[...,:2].transpose(1,2) + coeffs[...,2].unsqueeze(1)
-    coords = coords/coords[...,2].unsqueeze(-1)
+    coords1 = coords @ coeffs[...,:2].transpose(1,2) + coeffs[...,2].unsqueeze(1)
+    if (coords1[...,2]==0.).any(): return coords[...,:2].view(*sz)
+    coords = coords1/coords1[...,2].unsqueeze(-1)
     return coords[...,:2].view(*sz)
 
 # Cell

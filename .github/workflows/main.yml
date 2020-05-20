@@ -4,10 +4,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v1
-    - uses: actions/setup-python@v1
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
       with:
-        python-version: '3.6'
+        python-version: '3.8'
         architecture: 'x64'
     - name: Install the library
       run: |
@@ -27,7 +27,7 @@ jobs:
         if [ -n "$(git status -uno -s)" ]; then echo -e "!!! Detected unstripped out notebooks\n!!!Remember to run nbdev_install_git_hooks"; false; fi
     - name: Check if there is no diff library/notebooks
       run: |
-        if [-n "$(nbdev_diff_nbs)"]; then echo -e "!!! Detected difference between the notebooks and the library"; false; fi
+        if [ -n "$(nbdev_diff_nbs)" ]; then echo -e "!!! Detected difference between the notebooks and the library"; false; fi
 #    - name: Run tests
 #      run: |
 #        nbdev_test_nbs
