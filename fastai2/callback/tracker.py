@@ -43,6 +43,7 @@ class TrackerCallback(Callback):
     def after_fit(self): self.run=True
 
 # Cell
+@log_args
 class EarlyStoppingCallback(TrackerCallback):
     "A `TrackerCallback` that terminates training when monitored quantity stops improving."
     def __init__(self, monitor='valid_loss', comp=None, min_delta=0., patience=1):
@@ -61,6 +62,7 @@ class EarlyStoppingCallback(TrackerCallback):
                 raise CancelFitException()
 
 # Cell
+@log_args
 class SaveModelCallback(TrackerCallback):
     "A `TrackerCallback` that saves the model's best during training and loads it at the end."
     def __init__(self, monitor='valid_loss', comp=None, min_delta=0., fname='model', every_epoch=False, add_save=None, with_opt=False):
@@ -77,18 +79,21 @@ class SaveModelCallback(TrackerCallback):
         if self.every_epoch: self._save(f'{self.fname}_{self.epoch}')
         else: #every improvement
             super().after_epoch()
-            if self.new_best: self._save(f'{self.fname}')
+            if self.new_best:
+                print(f'Better model found at epoch {self.epoch} with {self.monitor} value: {self.best}.')
+                self._save(f'{self.fname}')
 
     def after_fit(self, **kwargs):
         "Load the best model."
         if not self.every_epoch: self.learn.load(f'{self.fname}')
 
 # Cell
+@log_args
 class ReduceLROnPlateau(TrackerCallback):
     "A `TrackerCallback` that reduces learning rate when a metric has stopped improving."
-    def __init__(self, monitor='valid_loss', comp=None, min_delta=0., patience=1, factor=10.):
+    def __init__(self, monitor='valid_loss', comp=None, min_delta=0., patience=1, factor=10., min_lr=0):
         super().__init__(monitor=monitor, comp=comp, min_delta=min_delta)
-        self.patience,self.factor = patience,factor
+        self.patience,self.factor,self.min_lr = patience,factor,min_lr
 
     def begin_fit(self): self.wait = 0; super().begin_fit()
     def after_epoch(self):
@@ -98,6 +103,8 @@ class ReduceLROnPlateau(TrackerCallback):
         else:
             self.wait += 1
             if self.wait >= self.patience:
-                for h in self.opt.hypers: h['lr'] /= self.factor
+                old_lr = self.opt.hypers[-1]['lr']
+                for h in self.opt.hypers: h['lr'] = max(h['lr'] / self.factor, self.min_lr)
                 self.wait = 0
-                print(f'Epoch {self.epoch}: reducing lr to {self.opt.hypers[-1]["lr"]}')
+                if self.opt.hypers[-1]["lr"] < old_lr:
+                    print(f'Epoch {self.epoch}: reducing lr to {self.opt.hypers[-1]["lr"]}')

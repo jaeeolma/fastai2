@@ -36,7 +36,7 @@ def mk_metric(m):
 # Cell
 def save_model(file, model, opt, with_opt=True, pickle_protocol=2):
     "Save `model` to `file` along with `opt` (if available, and if `with_opt`)"
-    if rank_distrib(): return # don't save if slave proc
+    if rank_distrib(): return # don't save if child proc
     if opt is None: with_opt=False
     state = get_model(model).state_dict()
     if with_opt: state = {'model': state, 'opt':opt.state_dict()}
@@ -71,6 +71,13 @@ _before_epoch = [event.begin_fit, event.begin_epoch]
 _after_epoch  = [event.after_epoch, event.after_fit]
 
 # Cell
+class _ConstantFunc():
+    "Returns a function that returns `o`"
+    def __init__(self, o): self.o = o
+    def __call__(self, *args, **kwargs): return self.o
+
+# Cell
+@log_args(but='dls,model,opt_func,cbs')
 class Learner():
     def __init__(self, dls, model, loss_func=None, opt_func=Adam, lr=defaults.lr, splitter=trainable_params, cbs=None,
                  metrics=None, path=None, model_dir='models', wd=None, wd_bn_bias=False, train_bn=True,
@@ -92,6 +99,7 @@ class Learner():
     @metrics.setter
     def metrics(self,v): self._metrics = L(v).map(mk_metric)
 
+    def _grab_cbs(self, cb_cls): return L(cb for cb in self.cbs if isinstance(cb, cb_cls))
     def add_cbs(self, cbs): L(cbs).map(self.add_cb)
     def remove_cbs(self, cbs): L(cbs).map(self.remove_cb)
     def add_cb(self, cb):
@@ -103,21 +111,23 @@ class Learner():
         return self
 
     def remove_cb(self, cb):
-        cb.learn = None
-        if hasattr(self, cb.name): delattr(self, cb.name)
-        if cb in self.cbs: self.cbs.remove(cb)
+        if isinstance(cb, type): self.remove_cbs(self._grab_cbs(cb))
+        else:
+            cb.learn = None
+            if hasattr(self, cb.name): delattr(self, cb.name)
+            if cb in self.cbs: self.cbs.remove(cb)
 
     @contextmanager
     def added_cbs(self, cbs):
         self.add_cbs(cbs)
-        yield
-        self.remove_cbs(cbs)
+        try: yield
+        finally: self.remove_cbs(cbs)
 
     @contextmanager
     def removed_cbs(self, cbs):
         self.remove_cbs(cbs)
-        yield self
-        self.add_cbs(cbs)
+        try: yield self
+        finally: self.add_cbs(cbs)
 
     def ordered_cbs(self, event): return [cb for cb in sort_by_run(self.cbs) if hasattr(cb, event)]
 
@@ -168,15 +178,16 @@ class Learner():
 
     def _do_epoch_validate(self, ds_idx=1, dl=None):
         if dl is None: dl = self.dls[ds_idx]
-        names = ['shuffle', 'drop_last']
         try:
-            dl,old,has = change_attrs(dl, names, [False,False])
             self.dl = dl;                                    self('begin_validate')
             with torch.no_grad(): self.all_batches()
         except CancelValidException:                         self('after_cancel_validate')
-        finally:
-            dl,*_ = change_attrs(dl, names, old, has);       self('after_validate')
+        finally:                                             self('after_validate')
 
+    def _end_cleanup(self):
+        self.dl,self.xb,self.yb,self.pred,self.loss = None,(None,),(None,),None,None
+
+    @log_args(but='cbs')
     def fit(self, n_epoch, lr=None, wd=None, cbs=None, reset_opt=False):
         with self.added_cbs(cbs):
             if reset_opt or not self.opt: self.create_opt()
@@ -195,7 +206,9 @@ class Learner():
                     finally:                       self('after_epoch')
 
             except CancelFitException:             self('after_cancel_fit')
-            finally:                               self('after_fit')
+            finally:
+                self('after_fit')
+                self._end_cleanup()
 
     def validate(self, ds_idx=1, dl=None, cbs=None):
         if dl is None: dl = self.dls[ds_idx]
@@ -207,10 +220,12 @@ class Learner():
 
     @delegates(GatherPredsCallback.__init__)
     def get_preds(self, ds_idx=1, dl=None, with_input=False, with_decoded=False, with_loss=False, act=None,
-                  inner=False, **kwargs):
+                  inner=False, reorder=True, **kwargs):
         if dl is None: dl = self.dls[ds_idx].new(shuffled=False, drop_last=False)
+        if reorder and hasattr(dl, 'get_idxs'):
+            idxs = dl.get_idxs()
+            dl = dl.new(get_idxs = _ConstantFunc(idxs))
         cb = GatherPredsCallback(with_input=with_input, with_loss=with_loss, **kwargs)
-        #with self.no_logging(), self.added_cbs(cb), self.loss_not_reduced(), self.no_mbar():
         ctx_mgrs = [self.no_logging(), self.added_cbs(cb), self.no_mbar()]
         if with_loss: ctx_mgrs.append(self.loss_not_reduced())
         with ExitStack() as stack:
@@ -224,10 +239,12 @@ class Learner():
             if res[pred_i] is not None:
                 res[pred_i] = act(res[pred_i])
                 if with_decoded: res.insert(pred_i+2, getattr(self.loss_func, 'decodes', noop)(res[pred_i]))
+            if reorder and hasattr(dl, 'get_idxs'): res = nested_reorder(res, tensor(idxs).argsort())
             return tuple(res)
+        self._end_cleanup()
 
     def predict(self, item, rm_type_tfms=None, with_input=False):
-        dl = self.dls.test_dl([item], rm_type_tfms=rm_type_tfms)
+        dl = self.dls.test_dl([item], rm_type_tfms=rm_type_tfms, num_workers=0)
         inp,preds,_,dec_preds = self.get_preds(dl=dl, with_input=True, with_decoded=True)
         i = getattr(self.dls, 'n_inp', -1)
         inp = (inp,) if i==1 else tuplify(inp)
@@ -488,7 +505,8 @@ add_docs(Learner,
 @patch
 def export(self:Learner, fname='export.pkl', pickle_protocol=2):
     "Export the content of `self` without the items and the optimizer state for inference"
-    if rank_distrib(): return # don't export if slave proc
+    if rank_distrib(): return # don't export if child proc
+    self._end_cleanup()
     old_dbunch = self.dls
     self.dls = self.dls.new_empty()
     state = self.opt.state_dict() if self.opt is not None else None
@@ -516,16 +534,53 @@ def tta(self:Learner, ds_idx=1, dl=None, n=4, item_tfms=None, batch_tfms=None, b
     "Return predictions on the `ds_idx` dataset or `dl` using Test Time Augmentation"
     if dl is None: dl = self.dls[ds_idx]
     if item_tfms is not None or batch_tfms is not None: dl = dl.new(after_item=item_tfms, after_batch=batch_tfms)
-    with dl.dataset.set_split_idx(0), self.no_mbar():
-        if hasattr(self,'progress'): self.progress.mbar = master_bar(list(range(n)))
-        aug_preds = []
-        for i in self.progress.mbar if hasattr(self,'progress') else range(n):
-            self.epoch = i #To keep track of progress on mbar since the progress callback will use self.epoch
-            aug_preds.append(self.get_preds(dl=dl, inner=True)[0][None])
-    aug_preds = torch.cat(aug_preds)
-    aug_preds = aug_preds.max(0)[0] if use_max else aug_preds.mean(0)
-    self.epoch = n
-    with dl.dataset.set_split_idx(1): preds,targs = self.get_preds(dl=dl, inner=True)
+    try:
+        self(event.begin_fit)
+        with dl.dataset.set_split_idx(0), self.no_mbar():
+            if hasattr(self,'progress'): self.progress.mbar = master_bar(list(range(n)))
+            aug_preds = []
+            for i in self.progress.mbar if hasattr(self,'progress') else range(n):
+                self.epoch = i #To keep track of progress on mbar since the progress callback will use self.epoch
+                aug_preds.append(self.get_preds(dl=dl, inner=True)[0][None])
+        aug_preds = torch.cat(aug_preds)
+        aug_preds = aug_preds.max(0)[0] if use_max else aug_preds.mean(0)
+        self.epoch = n
+        with dl.dataset.set_split_idx(1): preds,targs = self.get_preds(dl=dl, inner=True)
+    except CancelFitException:             self(event.after_cancel_fit)
+    finally:                               self(event.after_fit)
+
     if use_max: return torch.stack([preds, aug_preds], 0).max(0)[0],targs
     preds = (aug_preds,preds) if beta is None else torch.lerp(aug_preds, preds, beta)
     return preds,targs
+
+# Cell
+@patch
+def gather_args(self:Learner):
+    "Gather config parameters accessible to the learner"
+    # init_args
+    cb_args = {k:v for cb in self.cbs for k,v in getattr(cb,'init_args',{}).items()}
+    args = {**getattr(self,'init_args',{}), **cb_args, **getattr(self.dls,'init_args',{}),
+            **getattr(self.opt,'init_args',{}), **getattr(self.loss_func,'init_args',{})}
+    # callbacks used
+    args.update({f'{cb}':True for cb in self.cbs})
+    # input dimensions
+    try:
+        n_inp = self.dls.train.n_inp
+        args['n_inp'] = n_inp
+        xb = self.dls.train.one_batch()[:n_inp]
+        args.update({f'input {n+1} dim {i+1}':d for n in range(n_inp) for i,d in enumerate(list(detuplify(xb[n]).shape))})
+    except: print(f'Could not gather input dimensions')
+    # other useful information
+    with ignore_exceptions(): args['batch size'] = self.dls.bs
+    with ignore_exceptions(): args['batch per epoch'] = len(self.dls.train)
+    with ignore_exceptions(): args['model parameters'] = total_params(self.model)[0]
+    with ignore_exceptions(): args['loss function'] = f'{self.loss_func}'
+    with ignore_exceptions(): args['device'] = self.dls.device.type
+    with ignore_exceptions(): args['optimizer'] = self.opt_func.__name__
+    with ignore_exceptions(): args['frozen'] = bool(self.opt.frozen_idx)
+    with ignore_exceptions(): args['frozen idx'] = self.opt.frozen_idx
+    with ignore_exceptions(): args['dataset.tfms'] = f'{self.dls.dataset.tfms}'
+    with ignore_exceptions(): args['dls.after_item'] = f'{self.dls.after_item}'
+    with ignore_exceptions(): args['dls.before_batch'] = f'{self.dls.before_batch}'
+    with ignore_exceptions(): args['dls.after_batch'] = f'{self.dls.after_batch}'
+    return args

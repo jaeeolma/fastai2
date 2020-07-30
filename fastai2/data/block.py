@@ -19,9 +19,9 @@ class TransformBlock():
         self.dl_type,self.dls_kwargs = dl_type,({} if dls_kwargs is None else dls_kwargs)
 
 # Cell
-def CategoryBlock(vocab=None, add_na=False):
+def CategoryBlock(vocab=None, sort=True, add_na=False):
     "`TransformBlock` for single-label categorical targets"
-    return TransformBlock(type_tfms=Categorize(vocab=vocab, add_na=add_na))
+    return TransformBlock(type_tfms=Categorize(vocab=vocab, sort=sort, add_na=add_na))
 
 # Cell
 def MultiCategoryBlock(encoded=False, vocab=None, add_na=False):
@@ -30,18 +30,24 @@ def MultiCategoryBlock(encoded=False, vocab=None, add_na=False):
     return TransformBlock(type_tfms=tfm)
 
 # Cell
-def RegressionBlock(c_out=None):
+def RegressionBlock(n_out=None):
     "`TransformBlock` for float targets"
-    return TransformBlock(type_tfms=RegressionSetup(c_out))
+    return TransformBlock(type_tfms=RegressionSetup(c=n_out))
 
 # Cell
 from inspect import isfunction,ismethod
 
 # Cell
+def _merge_grouper(o):
+    if isinstance(o, LambdaType): return id(o)
+    elif isinstance(o, type): return o
+    elif (isfunction(o) or ismethod(o)): return o.__qualname__
+    return o.__class__
+
+# Cell
 def _merge_tfms(*tfms):
     "Group the `tfms` in a single list, removing duplicates (from the same class) and instantiating"
-    g = groupby(concat(*tfms), lambda o:
-        o if isinstance(o, type) else o.__qualname__ if (isfunction(o) or ismethod(o)) else o.__class__)
+    g = groupby(concat(*tfms), _merge_grouper)
     return L(v[-1] for k,v in g.items()).map(instantiate)
 
 def _zip(x): return L(x).zip()
@@ -148,7 +154,8 @@ def _find_fail_collate(s):
 
 # Cell
 @patch
-def summary(self: DataBlock, source, bs=4, **kwargs):
+def summary(self: DataBlock, source, bs=4, show_batch=False, **kwargs):
+    "Steps through the transform pipeline for one batch, and optionally calls `show_batch(**kwargs)` on the transient `Dataloaders`."
     print(f"Setting-up type transforms pipelines")
     dsets = self.datasets(source, verbose=True)
     print("\nBuilding one sample")
@@ -156,7 +163,7 @@ def summary(self: DataBlock, source, bs=4, **kwargs):
         _apply_pipeline(tl.tfms, get_first(dsets.train.items))
     print(f"\nFinal sample: {dsets.train[0]}\n\n")
 
-    dls = self.dataloaders(source, verbose=True)
+    dls = self.dataloaders(source, bs=bs, verbose=True)
     print("\nBuilding one batch")
     if len([f for f in dls.train.after_item.fs if f.name != 'noop'])!=0:
         print("Applying item_tfms to the first sample:")
@@ -187,3 +194,5 @@ def summary(self: DataBlock, source, bs=4, **kwargs):
         b = to_device(b, dls.device)
         b = _apply_pipeline(dls.train.after_batch, b)
     else: print("\nNo batch_tfms to apply")
+
+    if show_batch: dls.show_batch(**kwargs)

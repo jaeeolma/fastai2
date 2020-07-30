@@ -12,23 +12,23 @@ from .torch_basics import *
 class _BaseOptimizer():
     "Common functionality between `Optimizer` and `OptimWrapper`"
     def all_params(self, n=slice(None), with_grad=False):
-        res = L((p,pg,self.state[p],hyper) for pg,hyper in zip(self.param_groups[n],self.hypers[n]) for p in pg)
+        res = L((p,pg,self.state[p],hyper) for pg,hyper in zip(self.param_lists[n],self.hypers[n]) for p in pg)
         return L(o for o in res if o[0].grad is not None) if with_grad else res
 
     def _set_require_grad(self, rg, p,pg,state,h): p.requires_grad_(rg or state.get('force_train', False))
     def freeze_to(self, n):
-        self.frozen_idx = n if n >= 0 else len(self.param_groups) + n
-        if self.frozen_idx >= len(self.param_groups):
-            warn(f"Freezing {self.frozen_idx} groups; model has {len(self.param_groups)}; whole model is frozen.")
+        self.frozen_idx = n if n >= 0 else len(self.param_lists) + n
+        if self.frozen_idx >= len(self.param_lists):
+            warn(f"Freezing {self.frozen_idx} groups; model has {len(self.param_lists)}; whole model is frozen.")
         for o in self.all_params(slice(n, None)): self._set_require_grad(True,  *o)
         for o in self.all_params(slice(None, n)): self._set_require_grad(False, *o)
 
     def freeze(self):
-        assert(len(self.param_groups)>1)
+        assert(len(self.param_lists)>1)
         self.freeze_to(-1)
 
     def set_freeze(self, n, rg, ignore_force_train=False):
-        for p in self.param_groups[n]: p.requires_grad_(rg or (state.get('force_train', False) and not ignore_force_train))
+        for p in self.param_lists[n]: p.requires_grad_(rg or (state.get('force_train', False) and not ignore_force_train))
 
     def unfreeze(self): self.freeze_to(0)
     def set_hypers(self, **kwargs): L(kwargs.items()).starmap(self.set_hyper)
@@ -37,12 +37,21 @@ class _BaseOptimizer():
 
     def set_hyper(self, k, v):
         if isinstance(v, slice):
-            if v.start: v = even_mults(v.start, v.stop, len(self.param_groups))
-            else: v = [v.stop/10]*(len(self.param_groups)-1) + [v.stop]
+            if v.start: v = even_mults(v.start, v.stop, len(self.param_lists))
+            else: v = [v.stop/10]*(len(self.param_lists)-1) + [v.stop]
         v = L(v, use_list=None)
-        if len(v)==1: v = v*len(self.param_groups)
-        assert len(v) == len(self.hypers), f"Trying to set {len(v)} values for {k} but there are {len(self.param_groups)} parameter groups."
+        if len(v)==1: v = v*len(self.param_lists)
+        assert len(v) == len(self.hypers), f"Trying to set {len(v)} values for {k} but there are {len(self.param_lists)} parameter groups."
         self._set_hyper(k, v)
+
+    @property
+    def param_groups(self): return [{**{'params': pg}, **hp} for pg,hp in zip(self.param_lists, self.hypers)]
+    @param_groups.setter
+    def param_groups(self, v):
+        for pg,v_ in zip(self.param_lists,v): pg = v_['params']
+        for hyper,v_ in zip(self.hypers,v):
+            for k,t in v_.items():
+                if k != 'params': hyper[k] = t
 
 # Cell
 def _update(state, new=None):
@@ -51,6 +60,7 @@ def _update(state, new=None):
     return state
 
 # Cell
+@log_args(but='params,cbs,defaults')
 class Optimizer(_BaseOptimizer):
     "Base optimizer class for the fastai library, updating `params` with `cbs`"
     _keep_on_clear = ['force_train', 'do_wd']
@@ -58,8 +68,8 @@ class Optimizer(_BaseOptimizer):
         params = L(params)
         self.cbs,self.state,self.train_bn = L(cbs),defaultdict(dict),train_bn
         defaults = merge(*self.cbs.attrgot('defaults'), defaults)
-        self.param_groups = L(L(p) for p in params) if isinstance(params[0], (L,list)) else L([params])
-        self.hypers = L({} for _ in range_of(self.param_groups))
+        self.param_lists = L(L(p) for p in params) if isinstance(params[0], (L,list)) else L([params])
+        self.hypers = L({} for _ in range_of(self.param_lists))
         self.set_hypers(**defaults)
         self.frozen_idx = 0
 
@@ -82,14 +92,14 @@ class Optimizer(_BaseOptimizer):
         return {'state': state, 'hypers': self.hypers}
 
     def load_state_dict(self, sd):
-        assert len(sd["hypers"]) == len(self.param_groups)
-        assert len(sd["state"])  == sum([len(pg) for pg in self.param_groups])
+        assert len(sd["hypers"]) == len(self.param_lists)
+        assert len(sd["state"])  == sum([len(pg) for pg in self.param_lists])
         self.hypers = sd['hypers']
         self.state = {p: s for p,s in zip(self.all_params().itemgot(0), sd['state'])}
 
 # Cell
 def sgd_step(p, lr, **kwargs):
-    p.data.add_(-lr, p.grad.data)
+    p.data.add_(p.grad.data, alpha=-lr)
 
 # Cell
 def weight_decay(p, lr, wd, do_wd=True, **kwargs):
@@ -101,7 +111,7 @@ weight_decay.defaults = dict(wd=0.)
 # Cell
 def l2_reg(p, lr, wd, do_wd=True, **kwargs):
     "L2 regularization as adding `wd*p` to `p.grad`"
-    if do_wd and wd!=0: p.grad.data.add_(wd, p.data)
+    if do_wd and wd!=0: p.grad.data.add_(p.data, alpha=wd)
 
 l2_reg.defaults = dict(wd=0.)
 
@@ -110,7 +120,7 @@ def average_grad(p, mom, dampening=False, grad_avg=None, **kwargs):
     "Keeps track of the avg grads of `p` in `state` with `mom`."
     if grad_avg is None: grad_avg = torch.zeros_like(p.grad.data)
     damp = 1-mom if dampening else 1.
-    grad_avg.mul_(mom).add_(damp, p.grad.data)
+    grad_avg.mul_(mom).add_(p.grad.data, alpha=damp)
     return {'grad_avg': grad_avg}
 
 average_grad.defaults = dict(mom=0.9)
@@ -119,7 +129,7 @@ average_grad.defaults = dict(mom=0.9)
 def average_sqr_grad(p, sqr_mom, dampening=True, sqr_avg=None, **kwargs):
     if sqr_avg is None: sqr_avg = torch.zeros_like(p.grad.data)
     damp = 1-sqr_mom if dampening else 1.
-    sqr_avg.mul_(sqr_mom).addcmul_(damp, p.grad.data, p.grad.data)
+    sqr_avg.mul_(sqr_mom).addcmul_(p.grad.data, p.grad.data, value=damp)
     return {'sqr_avg': sqr_avg}
 
 average_sqr_grad.defaults = dict(sqr_mom=0.99)
@@ -127,9 +137,10 @@ average_sqr_grad.defaults = dict(sqr_mom=0.99)
 # Cell
 def momentum_step(p, lr, grad_avg, **kwargs):
     "Step for SGD with momentum with `lr`"
-    p.data.add_(-lr, grad_avg)
+    p.data.add_(grad_avg, alpha=-lr)
 
 # Cell
+@log_args(to_return=True, but_as=Optimizer.__init__)
 def SGD(params, lr, mom=0., wd=0., decouple_wd=True):
     "A `Optimizer` for SGD with `lr` and `mom` and `params`"
     cbs = [weight_decay] if decouple_wd else [l2_reg]
@@ -141,11 +152,12 @@ def SGD(params, lr, mom=0., wd=0., decouple_wd=True):
 def rms_prop_step(p, lr, sqr_avg, eps, grad_avg=None, **kwargs):
     "Step for SGD with momentum with `lr`"
     denom = sqr_avg.sqrt().add_(eps)
-    p.data.addcdiv_(-lr, (grad_avg if grad_avg is not None else p.grad), denom)
+    p.data.addcdiv_((grad_avg if grad_avg is not None else p.grad), denom, value=-lr)
 
 rms_prop_step.defaults = dict(eps=1e-8)
 
 # Cell
+@log_args(to_return=True, but_as=Optimizer.__init__)
 def RMSProp(params, lr, sqr_mom=0.99, mom=0., wd=0., decouple_wd=True):
     "A `Optimizer` for RMSProp with `lr`, `sqr_mom`, `mom` and `params`"
     cbs = [weight_decay] if decouple_wd else [l2_reg]
@@ -167,12 +179,13 @@ def adam_step(p, lr, mom, step, sqr_mom, grad_avg, sqr_avg, eps, **kwargs):
     "Step for Adam with `lr` on `p`"
     debias1 = debias(mom,     1-mom,     step)
     debias2 = debias(sqr_mom, 1-sqr_mom, step)
-    p.data.addcdiv_(-lr / debias1, grad_avg, (sqr_avg/debias2).sqrt() + eps)
+    p.data.addcdiv_(grad_avg, (sqr_avg/debias2).sqrt() + eps, value = -lr / debias1)
     return p
 
 adam_step._defaults = dict(eps=1e-5)
 
 # Cell
+@log_args(to_return=True, but_as=Optimizer.__init__)
 def Adam(params, lr, mom=0.9, sqr_mom=0.99, eps=1e-5, wd=0.01, decouple_wd=True):
     "A `Optimizer` for Adam with `lr`, `mom`, `sqr_mom`, `eps` and `params`"
     cbs = [weight_decay] if decouple_wd else [l2_reg]
@@ -191,30 +204,33 @@ def radam_step(p, lr, mom, step, sqr_mom, grad_avg, sqr_avg, eps, beta, **kwargs
         denom = (sqr_avg/debias2).sqrt()
         if eps: denom += eps
         if beta: denom = F.softplus(denom, beta)
-        p.data.addcdiv_(-lr*v / debias1, grad_avg, denom)
-    else: p.data.add_(-lr / debias1, grad_avg)
+        p.data.addcdiv_(grad_avg, denom, value = -lr*v / debias1)
+    else: p.data.add_(grad_avg, alpha=-lr / debias1)
     return p
 
 radam_step._defaults = dict(eps=1e-5)
 
 # Cell
+@log_args(to_return=True, but_as=Optimizer.__init__)
 def RAdam(params, lr, mom=0.9, sqr_mom=0.99, eps=1e-5, wd=0., beta=0., decouple_wd=True):
     "A `Optimizer` for Adam with `lr`, `mom`, `sqr_mom`, `eps` and `params`"
     cbs = [weight_decay] if decouple_wd else [l2_reg]
-    cbs = [partial(average_grad, dampening=True), average_sqr_grad, step_stat, radam_step]
+    cbs += [partial(average_grad, dampening=True), average_sqr_grad, step_stat, radam_step]
     return Optimizer(params, cbs, lr=lr, mom=mom, sqr_mom=sqr_mom, eps=eps, wd=wd, beta=beta)
 
 # Cell
 def qhadam_step(p, lr, mom, sqr_mom, sqr_avg, nu_1, nu_2, step, grad_avg, eps, **kwargs):
     debias1 = debias(mom,     1-mom,     step)
     debias2 = debias(sqr_mom, 1-sqr_mom, step)
-    p.data.addcdiv_(-lr, ((1-nu_1) * p.grad.data) + (nu_1 * (grad_avg / debias1)),
-                    (((1 - nu_2) * (p.grad.data)**2) + (nu_2 * (sqr_avg / debias2))).sqrt() + eps)
+    p.data.addcdiv_(((1-nu_1) * p.grad.data) + (nu_1 * (grad_avg / debias1)),
+                    (((1 - nu_2) * (p.grad.data)**2) + (nu_2 * (sqr_avg / debias2))).sqrt() + eps,
+                    value = -lr)
     return p
 
 qhadam_step._defaults = dict(eps=1e-8)
 
 # Cell
+@log_args(to_return=True, but_as=Optimizer.__init__)
 def QHAdam(params, lr, mom=0.999, sqr_mom=0.999, nu_1=0.7, nu_2 = 1.0, eps=1e-8, wd=0., decouple_wd=True):
     "An `Optimizer` for Adam with `lr`, `mom`, `sqr_mom`, `nus`, eps` and `params`"
     cbs = [weight_decay] if decouple_wd else [l2_reg]
@@ -234,9 +250,10 @@ larc_layer_lr.defaults = dict(trust_coeff=0.02, wd=0., eps=1e-8)
 # Cell
 def larc_step(p, local_lr, grad_avg=None, **kwargs):
     "Step for LARC `local_lr` on `p`"
-    p.data.add_(-local_lr, p.grad.data if grad_avg is None else grad_avg)
+    p.data.add_(p.grad.data if grad_avg is None else grad_avg, alpha = -local_lr)
 
 # Cell
+@log_args(to_return=True, but_as=Optimizer.__init__)
 def Larc(params, lr, mom=0.9, clip=True, trust_coeff=0.02, eps=1e-8, wd=0., decouple_wd=True):
     "A `Optimizer` for Adam with `lr`, `mom`, `sqr_mom`, `eps` and `params`"
     cbs = [weight_decay] if decouple_wd else [l2_reg]
@@ -253,11 +270,12 @@ def lamb_step(p, lr, mom, step, sqr_mom, grad_avg, sqr_avg, eps, **kwargs):
     step = (grad_avg/debias1) / ((sqr_avg/debias2).sqrt()+eps)
     r2 = step.pow(2).mean().sqrt()
     q = 1 if r1 == 0 or r2 == 0 else min(r1/r2,10)
-    p.data.add_(-lr * q, step)
+    p.data.add_(step, alpha = -lr * q)
 
 lamb_step._defaults = dict(eps=1e-6, wd=0.)
 
 # Cell
+@log_args(to_return=True, but_as=Optimizer.__init__)
 def Lamb(params, lr, mom=0.9, sqr_mom=0.99, eps=1e-5, wd=0., decouple_wd=True):
     "A `Optimizer` for Adam with `lr`, `mom`, `sqr_mom`, `eps` and `params`"
     cbs = [weight_decay] if decouple_wd else [l2_reg]
@@ -265,6 +283,7 @@ def Lamb(params, lr, mom=0.9, sqr_mom=0.99, eps=1e-5, wd=0., decouple_wd=True):
     return Optimizer(params, cbs, lr=lr, mom=mom, sqr_mom=sqr_mom, eps=eps, wd=wd)
 
 # Cell
+@log_args(but='opt')
 class Lookahead(Optimizer, GetAttr):
     "Wrap `opt` in a lookahead optimizer"
     _default='opt'
@@ -277,9 +296,9 @@ class Lookahead(Optimizer, GetAttr):
         self.opt.step()
         self.count += 1
         if self.count%self.k != 0: return
-        for slow_pg,fast_pg in zip(self.slow_weights,self.param_groups):
+        for slow_pg,fast_pg in zip(self.slow_weights,self.param_lists):
             for slow_p,fast_p in zip(slow_pg,fast_pg):
-                slow_p.data.add_(self.alpha, fast_p.data-slow_p.data)
+                slow_p.data.add_(fast_p.data-slow_p.data, alpha=self.alpha)
                 fast_p.data.copy_(slow_p.data)
 
     def clear_state(self):
@@ -297,12 +316,12 @@ class Lookahead(Optimizer, GetAttr):
         self.opt.load_state_dict(sd)
 
     def _init_state(self): self.count,self.slow_weights = 0,None
-    def _copy_weights(self): self.slow_weights = L(L(p.clone().detach() for p in pg) for pg in self.param_groups)
+    def _copy_weights(self): self.slow_weights = L(L(p.clone().detach() for p in pg) for pg in self.param_lists)
 
     @property
-    def param_groups(self): return self.opt.param_groups
-    @param_groups.setter
-    def param_groups(self, v): self.opt.param_groups = v
+    def param_lists(self): return self.opt.param_lists
+    @param_lists.setter
+    def param_lists(self, v): self.opt.param_lists = v
 
 # Cell
 @delegates(RAdam)
@@ -343,12 +362,6 @@ class OptimWrapper(_BaseOptimizer, GetAttr):
         self.frozen_idx = 0
 
     @property
-    def param_groups(self): return [pg['params'] for pg in self.opt.param_groups]
-    @param_groups.setter
-    def param_groups(self, v):
-        for pg,v_ in zip(self.opt.param_groups,v): pg['params'] = v_
-
-    @property
     def hypers(self):
         return [{self.fwd_map[k]:v for k,v in detuplify_pg(pg).items() if k != 'params'} for pg in self.opt.param_groups]
 
@@ -356,3 +369,9 @@ class OptimWrapper(_BaseOptimizer, GetAttr):
         for pg,v_ in zip(self.opt.param_groups,v): pg = set_item_pg(pg, self.bwd_map[k], v_)
 
     def clear_state(self): self.opt.state = defaultdict(dict, {})
+
+    @property
+    def param_lists(self): return [pg['params'] for pg in self.opt.param_groups]
+    @param_lists.setter
+    def param_lists(self, v):
+        for pg,v_ in zip(self.opt.param_groups,v): pg['params'] = v_

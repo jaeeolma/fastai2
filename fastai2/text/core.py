@@ -110,9 +110,9 @@ class BaseTokenizer():
 class SpacyTokenizer():
     "Spacy tokenizer for `lang`"
     def __init__(self, lang='en', special_toks=None, buf_sz=5000):
-        special_toks = ifnone(special_toks, defaults.text_spec_tok)
+        self.special_toks = ifnone(special_toks, defaults.text_spec_tok)
         nlp = spacy.blank(lang, disable=["parser", "tagger", "ner"])
-        for w in special_toks: nlp.tokenizer.add_special_case(w, [{ORTH: w}])
+        for w in self.special_toks: nlp.tokenizer.add_special_case(w, [{ORTH: w}])
         self.pipe,self.buf_sz = nlp.pipe,buf_sz
 
     def __call__(self, items):
@@ -309,18 +309,21 @@ class Tokenizer(Transform):
 
     def decodes(self, o): return TitledStr(self.sep.join(o))
 
+    @property
+    def special_toks(self,): return self.tokenizer.special_toks
+
 # Cell
 eu_langs = ["bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "ga", "hr", "hu",
             "it","lt","lv","mt","nl","pl","pt","ro","sk","sl","sv"] # all European langs
 
 # Cell
 class SentencePieceTokenizer():#TODO: pass the special tokens symbol to sp
-    "Spacy tokenizer for `lang`"
+    "SentencePiece tokenizer for `lang`"
     def __init__(self, lang='en', special_toks=None, sp_model=None, vocab_sz=None, max_vocab_sz=30000,
                  model_type='unigram', char_coverage=None, cache_dir='tmp'):
         try: from sentencepiece import SentencePieceTrainer,SentencePieceProcessor
         except ImportError:
-            raise Exception('sentencepiece module is missing: run `pip install sentencepiece`')
+            raise Exception('sentencepiece module is missing: run `pip install sentencepiece!=0.1.90,!=0.1.91`')
         self.sp_model,self.cache_dir = sp_model,Path(cache_dir)
         self.vocab_sz,self.max_vocab_sz,self.model_type = vocab_sz,max_vocab_sz,model_type
         self.char_coverage = ifnone(char_coverage, 0.99999 if lang in eu_langs else 0.9998)

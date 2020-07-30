@@ -9,7 +9,6 @@ from .core import *
 from .data import *
 from .augment import *
 from . import models
-from . import models
 
 # Cell
 def _is_pool_type(l): return re.search(r'Pool[123]d$', l.__class__.__name__)
@@ -162,6 +161,7 @@ def _add_norm(dls, meta, pretrained):
     after_batch.add(Normalize.from_stats(*stats))
 
 # Cell
+@log_args(to_return=True, but_as=Learner.__init__)
 @delegates(Learner.__init__)
 def cnn_learner(dls, arch, loss_func=None, pretrained=True, cut=None, splitter=None,
                 y_range=None, config=None, n_out=None, normalize=True, **kwargs):
@@ -184,6 +184,7 @@ def unet_config(**kwargs):
     return kwargs
 
 # Cell
+@log_args(to_return=True, but_as=Learner.__init__)
 @delegates(Learner.__init__)
 def unet_learner(dls, arch, loss_func=None, pretrained=True, cut=None, splitter=None, config=None, n_in=3, n_out=None,
                  normalize=True, **kwargs):

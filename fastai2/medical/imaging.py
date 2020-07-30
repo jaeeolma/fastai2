@@ -2,7 +2,7 @@
 
 __all__ = ['DcmDataset', 'DcmTag', 'DcmMultiValue', 'dcmread', 'get_dicom_files', 'get_dicom_files', 'TensorDicom',
            'PILDicom', 'pixels', 'scaled_px', 'array_freqhist_bins', 'dicom_windows', 'TensorCTScan', 'PILCTScan',
-           'show', 'uniform_blur2d', 'gauss_blur2d', 'mask2bbox', 'crop_resize', 'shape']
+           'uniform_blur2d', 'gauss_blur2d', 'mask2bbox', 'crop_resize', 'shape']
 
 # Cell
 from ..basics import *
@@ -41,7 +41,7 @@ class PILDicom(PILBase):
     def create(cls, fn:(Path,str,bytes), mode=None)->None:
         "Open a `DICOM file` from path `fn` or bytes `fn` and load it as a `PIL Image`"
         if isinstance(fn,bytes): im = Image.fromarray(pydicom.dcmread(pydicom.filebase.DicomBytesIO(fn)).pixel_array)
-        if isinstance(fn,Path): im = Image.fromarray(dcmread(fn).pixel_array)
+        if isinstance(fn,(Path,str)): im = Image.fromarray(dcmread(fn).pixel_array)
         im.load()
         im = im._new(im.im)
         return cls(im.convert(mode) if mode else im)

@@ -8,6 +8,7 @@ from .progress import *
 from .fp16 import *
 
 # Cell
+@log_args
 class ShortEpochCallback(Callback):
     "Fit just `pct` of an epoch, then stop"
     def __init__(self,pct=0.01,short_valid=True): self.pct,self.short_valid = pct,short_valid
@@ -17,6 +18,7 @@ class ShortEpochCallback(Callback):
         if self.short_valid: raise CancelValidException
 
 # Cell
+@log_args
 class GradientAccumulation(Callback):
     "Accumulate gradients before updating weights"
     toward_end,run_before=True,MixedPrecision
@@ -35,11 +37,12 @@ class GradientAccumulation(Callback):
 # Cell
 bn_types = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)
 
-def set_bn_eval(m:nn.Module)->None:
+def set_bn_eval(m:nn.Module, use_eval=True)->None:
     "Set bn layers in eval mode for all recursive children of `m`."
     for l in m.children():
         if isinstance(l, bn_types) and not next(l.parameters()).requires_grad:
-            l.eval()
+            if use_eval: l.eval()
+            else:        l.train()
         set_bn_eval(l)
 
 class BnFreeze(Callback):

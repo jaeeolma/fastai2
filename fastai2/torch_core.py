@@ -8,10 +8,10 @@ __all__ = ['progress_bar', 'master_bar', 'subplots', 'show_image', 'show_titled_
            'ShowTitle', 'TitledInt', 'TitledFloat', 'TitledStr', 'TitledTuple', 'get_empty_df', 'display_df',
            'get_first', 'one_param', 'item_find', 'find_device', 'find_bs', 'Module', 'get_model', 'one_hot',
            'one_hot_decode', 'params', 'trainable_params', 'norm_types', 'bn_bias_params', 'batch_to_samples', 'logit',
-           'num_distrib', 'rank_distrib', 'distrib_barrier', 'base_doc', 'doc', 'to_image', 'make_cross_image',
-           'show_image_batch', 'requires_grad', 'init_default', 'cond_init', 'apply_leaf', 'apply_init',
-           'set_num_threads', 'ProcessPoolExecutor', 'parallel', 'run_procs', 'parallel_gen', 'script_use_ctx',
-           'script_save_ctx', 'script_fwd', 'script_bwd', 'grad_module', 'flatten_check', 'flatten_check']
+           'num_distrib', 'rank_distrib', 'distrib_barrier', 'base_doc', 'doc', 'nested_reorder', 'to_image',
+           'make_cross_image', 'show_image_batch', 'requires_grad', 'init_default', 'cond_init', 'apply_leaf',
+           'apply_init', 'set_num_threads', 'ProcessPoolExecutor', 'parallel', 'run_procs', 'parallel_gen',
+           'script_use_ctx', 'script_save_ctx', 'script_fwd', 'script_bwd', 'grad_module', 'flatten_check']
 
 # Cell
 from .imports import *
@@ -220,9 +220,14 @@ def to_concat(xs, dim=0):
 
 # Cell
 @patch
-def set_meta(self:Tensor, x):
+def set_meta(self:Tensor, x, copy_meta=False):
     "Set all metadata in `__dict__`"
-    if hasattr(x,'__dict__'): self.__dict__ = x.__dict__
+    if not hasattr(x,'__dict__'): return
+    d = x.__dict__
+    if copy_meta:
+        d = copy(d)
+        if '_meta' in d: d['_meta'] = copy(d['_meta'])
+    self.__dict__ = d
 
 # Cell
 @patch
@@ -231,21 +236,24 @@ def get_meta(self:Tensor, n, d=None):
     return getattr(self, '_meta', {}).get(n, d)
 
 # Cell
+if not hasattr(torch,'as_subclass'):
+    setattr(torch, 'as_subclass', torch.Tensor.as_subclass)
+
+# Cell
 @patch
 def as_subclass(self:Tensor, typ):
-    "Cast to `typ` (should be in future PyTorch version, so remove this then)"
-    res = torch.Tensor._make_subclass(typ, self)
-    return retain_meta(self, res)
+    "Cast to `typ` and include `__dict__` and meta"
+    return retain_meta(self, torch.as_subclass(self, typ))
 
 # Cell
 class TensorBase(Tensor):
     def __new__(cls, x, **kwargs):
         res = cast(tensor(x), cls)
-        res._meta = kwargs
+        if kwargs: res._meta = kwargs
         return res
 
     @classmethod
-    def _before_cast(cls, x): return x if isinstance(x,Tensor) else tensor(x)
+    def _before_cast(cls, x): return tensor(x)
 
     def __reduce_ex__(self,proto):
         torch.utils.hooks.warn_if_has_hooks(self)
@@ -270,11 +278,11 @@ def _patch_tb():
         def _f(self, *args, **kwargs):
             cls = self.__class__
             res = getattr(super(TensorBase, self), fn)(*args, **kwargs)
-            return retain_type(res, self)
+            return retain_type(res, self, copy_meta=True)
         return _f
 
     t = tensor([1])
-    skips = 'as_subclass __getitem__ __class__ __deepcopy__ __delattr__ __dir__ __doc__ __getattribute__ __hash__ __init__ \
+    skips = 'as_subclass imag real __getitem__ __class__ __deepcopy__ __delattr__ __dir__ __doc__ __getattribute__ __hash__ __init__ \
         __init_subclass__ __new__ __reduce__ __reduce_ex__ __repr__ __module__ __setstate__'.split()
 
     for fn in dir(t):
@@ -570,7 +578,7 @@ def rank_distrib():
 # Cell
 def distrib_barrier():
     "Place a synchronization barrier in distributed training so that ALL sub-processes in the pytorch process group must arrive here before proceeding."
-    if num_distrib() > 1: torch.distributed.barrier()
+    if num_distrib() > 1 and torch.distributed.is_initialized(): torch.distributed.barrier()
 
 # Cell
 # Saving arrays requires pytables - optional dependency
@@ -607,6 +615,14 @@ def doc(elt):
         from nbdev.showdoc import doc
         doc(elt)
     except: base_doc(elt)
+
+# Cell
+def nested_reorder(t, idxs):
+    "Reorder all tensors in `t` using `idxs`"
+    if isinstance(t, (Tensor,L)): return t[idxs]
+    elif is_listy(t): return type(t)(nested_reorder(t_, idxs) for t_ in t)
+    if t is None: return t
+    raise TypeError(f"Expected tensor, tuple, list or L but got {type(t)}")
 
 # Cell
 def to_image(x):

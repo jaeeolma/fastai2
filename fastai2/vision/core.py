@@ -92,6 +92,7 @@ class PILBase(Image.Image, metaclass=BypassNewMeta):
     def create(cls, fn:(Path,str,Tensor,ndarray,bytes), **kwargs)->None:
         "Open an `Image` from path `fn`"
         if isinstance(fn,TensorImage): fn = fn.permute(1,2,0).type(torch.uint8)
+        if isinstance(fn, TensorMask): fn = fn.type(torch.uint8)
         if isinstance(fn,Tensor): fn = fn.numpy()
         if isinstance(fn,ndarray): return cls(Image.fromarray(fn))
         if isinstance(fn,bytes): fn = io.BytesIO(fn)
@@ -247,7 +248,6 @@ class PointScaler(Transform):
 # Cell
 class BBoxLabeler(Transform):
     def setups(self, dl): self.vocab = dl.vocab
-    def before_call(self): self.bbox,self.lbls = None,None
 
     def decode (self, x, **kwargs):
         self.bbox,self.lbls = None,None
