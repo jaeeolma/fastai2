@@ -87,11 +87,11 @@ class TextLearner(Learner):
     "Basic class for a `Learner` in NLP."
     def __init__(self, dls, model, alpha=2., beta=1., moms=(0.8,0.7,0.8), **kwargs):
         super().__init__(dls, model, moms=moms, **kwargs)
-        self.add_cbs([ModelReseter(), RNNRegularizer(alpha=alpha, beta=beta)])
+        self.add_cbs([ModelResetter(), RNNRegularizer(alpha=alpha, beta=beta)])
 
     def save_encoder(self, file):
         "Save the encoder to `file` in the model directory"
-        if rank_distrib(): return # don't save if slave proc
+        if rank_distrib(): return # don't save if child proc
         encoder = get_model(self.model)[0]
         if hasattr(encoder, 'module'): encoder = encoder.module
         torch.save(encoder.state_dict(), join_path_file(file, self.path/self.model_dir, ext='.pth'))
@@ -192,22 +192,21 @@ def _get_text_vocab(dls):
 # Cell
 @log_args(to_return=True, but_as=Learner.__init__)
 @delegates(Learner.__init__)
-def language_model_learner(dls, arch, config=None, drop_mult=1., pretrained=True, pretrained_fnames=None, **kwargs):
+def language_model_learner(dls, arch, config=None, drop_mult=1., backwards=False, pretrained=True, pretrained_fnames=None, **kwargs):
     "Create a `Learner` with a language model from `dls` and `arch`."
     vocab = _get_text_vocab(dls)
     model = get_language_model(arch, len(vocab), config=config, drop_mult=drop_mult)
     meta = _model_meta[arch]
     learn = LMLearner(dls, model, loss_func=CrossEntropyLossFlat(), splitter=meta['split_lm'], **kwargs)
-    #TODO: add backard
-    #url = 'url_bwd' if data.backwards else 'url'
+    url = 'url_bwd' if backwards else 'url'
     if pretrained or pretrained_fnames:
         if pretrained_fnames is not None:
             fnames = [learn.path/learn.model_dir/f'{fn}.{ext}' for fn,ext in zip(pretrained_fnames, ['pth', 'pkl'])]
         else:
-            if 'url' not in meta:
+            if url not in meta:
                 warn("There are no pretrained weights for that architecture yet!")
                 return learn
-            model_path = untar_data(meta['url'] , c_key='model')
+            model_path = untar_data(meta[url] , c_key='model')
             fnames = [list(model_path.glob(f'*.{ext}'))[0] for ext in ['pth', 'pkl']]
         learn = learn.load_pretrained(*fnames)
     return learn
@@ -215,7 +214,7 @@ def language_model_learner(dls, arch, config=None, drop_mult=1., pretrained=True
 # Cell
 @log_args(to_return=True, but_as=Learner.__init__)
 @delegates(Learner.__init__)
-def text_classifier_learner(dls, arch, seq_len=72, config=None, pretrained=True, drop_mult=0.5, n_out=None,
+def text_classifier_learner(dls, arch, seq_len=72, config=None, backwards=False, pretrained=True, drop_mult=0.5, n_out=None,
                             lin_ftrs=None, ps=None, max_len=72*20, y_range=None, **kwargs):
     "Create a `Learner` with a text classifier from `dls` and `arch`."
     vocab = _get_text_vocab(dls)
@@ -225,11 +224,12 @@ def text_classifier_learner(dls, arch, seq_len=72, config=None, pretrained=True,
                                 drop_mult=drop_mult, lin_ftrs=lin_ftrs, ps=ps, max_len=max_len)
     meta = _model_meta[arch]
     learn = TextLearner(dls, model, splitter=meta['split_clas'], **kwargs)
+    url = 'url_bwd' if backwards else 'url'
     if pretrained:
-        if 'url' not in meta:
+        if url not in meta:
             warn("There are no pretrained weights for that architecture yet!")
             return learn
-        model_path = untar_data(meta['url'], c_key='model')
+        model_path = untar_data(meta[url], c_key='model')
         fnames = [list(model_path.glob(f'*.{ext}'))[0] for ext in ['pth', 'pkl']]
         learn = learn.load_pretrained(*fnames, model=learn.model[0])
         learn.freeze()

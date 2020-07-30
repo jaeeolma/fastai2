@@ -2,8 +2,8 @@
 
 __all__ = ['make_date', 'add_datepart', 'add_elapsed_times', 'cont_cat_split', 'df_shrink_dtypes', 'df_shrink',
            'Tabular', 'TabularPandas', 'TabularProc', 'Categorify', 'setups', 'encodes', 'decodes', 'NormalizeTab',
-           'setups', 'encodes', 'decodes', 'FillStrategy', 'FillMissing', 'ReadTabBatch', 'TabDataLoader', 'encodes',
-           'decodes', 'setups', 'encodes', 'decodes']
+           'setups', 'encodes', 'decodes', 'FillStrategy', 'FillMissing', 'ReadTabBatch', 'TabDataLoader', 'setups',
+           'encodes', 'decodes', 'setups', 'encodes', 'decodes']
 
 # Cell
 from ..torch_basics import *
@@ -96,7 +96,8 @@ def df_shrink_dtypes(df, skip=[], obj2cat=True, int2uint=False):
 
     typemap = {'int'   : [(np.dtype(x), np.iinfo(x).min, np.iinfo(x).max) for x in (np.int8, np.int16, np.int32, np.int64)],
                'uint'  : [(np.dtype(x), np.iinfo(x).min, np.iinfo(x).max) for x in (np.uint8, np.uint16, np.uint32, np.uint64)],
-               'float' : [(np.dtype(x), np.finfo(x).min, np.finfo(x).max) for x in (np.float32, np.float64, np.float128)],}
+               'float' : [(np.dtype(x), np.finfo(x).min, np.finfo(x).max) for x in (np.float32, np.float64, np.longdouble)]
+              }
     if obj2cat: typemap['object'] = 'category'  # User wants to categorify dtype('Object'), which may not always save space
     else:       excl_types.add('object')
 
@@ -241,7 +242,7 @@ class Categorify(TabularProc):
 def setups(self, to:Tabular):
     if len(to.y_names) > 0:
         if self.vocab is None:
-            self.vocab = CategoryMap(getattr(to, 'train', to).iloc[:,to.y_names[0]].items)
+            self.vocab = CategoryMap(getattr(to, 'train', to).iloc[:,to.y_names[0]].items, strict=True)
         else:
             self.vocab = CategoryMap(self.vocab, sort=False, add_na=self.add_na)
         self.c = len(self.vocab)
@@ -352,6 +353,11 @@ class TabDataLoader(TfmdDL):
 TabularPandas._dl_type = TabDataLoader
 
 # Cell
+@EncodedMultiCategorize
+def setups(self, to:Tabular):
+    self.c = len(self.vocab)
+    return self(to)
+
 @EncodedMultiCategorize
 def encodes(self, to:Tabular): return to
 
