@@ -7,11 +7,12 @@ __all__ = ['progress_bar', 'master_bar', 'subplots', 'show_image', 'show_titled_
            'TensorImage', 'TensorImageBW', 'TensorMask', 'TitledTensorScalar', 'concat', 'Chunks', 'show_title',
            'ShowTitle', 'TitledInt', 'TitledFloat', 'TitledStr', 'TitledTuple', 'get_empty_df', 'display_df',
            'get_first', 'one_param', 'item_find', 'find_device', 'find_bs', 'Module', 'get_model', 'one_hot',
-           'one_hot_decode', 'params', 'trainable_params', 'norm_types', 'bn_bias_params', 'batch_to_samples', 'logit',
-           'num_distrib', 'rank_distrib', 'distrib_barrier', 'base_doc', 'doc', 'nested_reorder', 'to_image',
+           'one_hot_decode', 'params', 'trainable_params', 'norm_types', 'norm_bias_params', 'batch_to_samples',
+           'logit', 'num_distrib', 'rank_distrib', 'distrib_barrier', 'base_doc', 'doc', 'nested_reorder', 'to_image',
            'make_cross_image', 'show_image_batch', 'requires_grad', 'init_default', 'cond_init', 'apply_leaf',
-           'apply_init', 'set_num_threads', 'ProcessPoolExecutor', 'parallel', 'run_procs', 'parallel_gen',
-           'script_use_ctx', 'script_save_ctx', 'script_fwd', 'script_bwd', 'grad_module', 'flatten_check']
+           'apply_init', 'set_num_threads', 'ProcessPoolExecutor', 'parallel', 'parallel_chunks', 'run_procs',
+           'parallel_gen', 'script_use_ctx', 'script_save_ctx', 'script_fwd', 'script_bwd', 'grad_module',
+           'flatten_check']
 
 # Cell
 from .imports import *
@@ -101,6 +102,7 @@ def _array2tensor(x):
     return torch.from_numpy(x)
 
 # Cell
+@use_kwargs_dict(dtype=None, device=None, requires_grad=False, pin_memory=False)
 def tensor(x, *rest, **kwargs):
     "Like `torch.as_tensor`, but handle lists too, and can pass multiple vector elements directly."
     if len(rest): x = (x,)+rest
@@ -526,10 +528,10 @@ def trainable_params(m):
 norm_types = (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d, nn.InstanceNorm1d, nn.InstanceNorm2d, nn.InstanceNorm3d)
 
 # Cell
-def bn_bias_params(m, with_bias=True): # TODO: Rename to `norm_bias_params`
+def norm_bias_params(m, with_bias=True):
     "Return all bias and BatchNorm parameters"
     if isinstance(m, norm_types): return L(m.parameters())
-    res = L(m.children()).map(bn_bias_params, with_bias=with_bias).concat()
+    res = L(m.children()).map(norm_bias_params, with_bias=with_bias).concat()
     if with_bias and getattr(m, 'bias', None) is not None: res.append(m.bias)
     return res
 
@@ -692,7 +694,7 @@ def set_num_threads(nt):
     "Get numpy (and others) to use `nt` threads"
     try: import mkl; mkl.set_num_threads(nt)
     except: pass
-    torch.set_num_threads(1)
+    torch.set_num_threads(nt)
     os.environ['IPC_ENABLE']='1'
     for o in ['OPENBLAS_NUM_THREADS','NUMEXPR_NUM_THREADS','OMP_NUM_THREADS','MKL_NUM_THREADS']:
         os.environ[o] = str(nt)
@@ -723,22 +725,36 @@ def parallel(f, items, *args, n_workers=defaults.cpus, total=None, progress=True
         return L(r)
 
 # Cell
+@delegates(parallel)
+def parallel_chunks(f, items, n_workers=0, **kwargs):
+    "Calls `parallel` after first creating `n_workers` batches from `items`"
+    nc = 1 if n_workers==0 else n_workers
+    chunks = list(chunked(items, n_chunks=nc))
+    res = parallel(f, chunks, n_workers= n_workers, **kwargs)
+    return res.sum()
+
+# Cell
 def run_procs(f, f_done, args):
     "Call `f` for each item in `args` in parallel, yielding `f_done`"
     processes = L(args).map(Process, args=arg0, target=f)
     for o in processes: o.start()
-    try: yield from f_done()
-    except Exception as e: print(e)
-    finally: processes.map(Self.join())
+    yield from f_done()
+#     except Exception as e: print(e)
+    processes.map(Self.join())
 
 # Cell
-def parallel_gen(cls, items, n_workers=defaults.cpus, as_gen=False, **kwargs):
+def parallel_gen(cls, items, n_workers=defaults.cpus, **kwargs):
     "Instantiate `cls` in `n_workers` procs & call each on a subset of `items` in parallel."
+    if n_workers==0:
+        yield from enumerate(list(cls(**kwargs)(items)))
+        return
     batches = np.array_split(items, n_workers)
     idx = np.cumsum(0 + L(batches).map(len))
     queue = Queue()
     def f(batch, start_idx):
-        for i,b in enumerate(cls(**kwargs)(batch)): queue.put((start_idx+i,b))
+        obj = cls(**kwargs)
+        res = obj(batch)
+        for i,b in enumerate(res): queue.put((start_idx+i,b))
     def done(): return (queue.get() for _ in progress_bar(items, leave=False))
     yield from run_procs(f, done, L(batches,idx).zip())
 
