@@ -82,9 +82,9 @@ class AttrGetter(ItemTransform):
     def encodes(self, x): return getattr(x, self.nm, self.default)
 
 # Cell
-def RandomSplitter(valid_pct=0.2, seed=None, **kwargs):
+def RandomSplitter(valid_pct=0.2, seed=None):
     "Create function that splits `items` between train/val with `valid_pct` randomly."
-    def _inner(o, **kwargs):
+    def _inner(o):
         if seed is not None: torch.manual_seed(seed)
         rand_idx = L(int(i) for i in torch.randperm(len(o)))
         cut = int(valid_pct * len(o))
@@ -92,17 +92,17 @@ def RandomSplitter(valid_pct=0.2, seed=None, **kwargs):
     return _inner
 
 # Cell
-def TrainTestSplitter(test_size=0.2, random_state=None, stratify=None, **kwargs):
+def TrainTestSplitter(test_size=0.2, random_state=None, stratify=None, train_size=None, shuffle=True):
     "Split `items` into random train and test subsets using sklearn train_test_split utility."
     def _inner(o, **kwargs):
-        train, valid = train_test_split(range(len(o)), test_size=test_size, random_state=random_state, stratify=stratify, **kwargs)
+        train, valid = train_test_split(range(len(o)), test_size=test_size, random_state=random_state, stratify=stratify, train_size=train_size, shuffle=shuffle)
         return L(train), L(valid)
     return _inner
 
 # Cell
 def IndexSplitter(valid_idx):
     "Split `items` so that `val_idx` are in the validation set and the others in the training set"
-    def _inner(o, **kwargs):
+    def _inner(o):
         train_idx = np.setdiff1d(np.array(range_of(o)), np.array(valid_idx))
         return L(train_idx, use_list=True), L(valid_idx, use_list=True)
     return _inner
@@ -115,14 +115,14 @@ def _grandparent_idxs(items, name):
 # Cell
 def GrandparentSplitter(train_name='train', valid_name='valid'):
     "Split `items` from the grand parent folder names (`train_name` and `valid_name`)."
-    def _inner(o, **kwargs):
+    def _inner(o):
         return _grandparent_idxs(o, train_name),_grandparent_idxs(o, valid_name)
     return _inner
 
 # Cell
 def FuncSplitter(func):
     "Split `items` by result of `func` (`True` for validation, `False` for training set)."
-    def _inner(o, **kwargs):
+    def _inner(o):
         val_idx = mask2idxs(func(o_) for o_ in o)
         return IndexSplitter(val_idx)(o)
     return _inner
@@ -130,7 +130,7 @@ def FuncSplitter(func):
 # Cell
 def MaskSplitter(mask):
     "Split `items` depending on the value of `mask`."
-    def _inner(o, **kwargs): return IndexSplitter(mask2idxs(mask))(o)
+    def _inner(o): return IndexSplitter(mask2idxs(mask))(o)
     return _inner
 
 # Cell
@@ -138,13 +138,13 @@ def FileSplitter(fname):
     "Split `items` depending on the value of `mask`."
     valid = Path(fname).read().split('\n')
     def _func(x): return x.name in valid
-    def _inner(o, **kwargs): return FuncSplitter(_func)(o)
+    def _inner(o): return FuncSplitter(_func)(o)
     return _inner
 
 # Cell
 def ColSplitter(col='is_valid'):
     "Split `items` (supposed to be a dataframe) by value in `col`"
-    def _inner(o, **kwargs):
+    def _inner(o):
         assert isinstance(o, pd.DataFrame), "ColSplitter only works when your items are a pandas DataFrame"
         valid_idx = (o.iloc[:,col] if isinstance(col, int) else o[col]).values
         return IndexSplitter(mask2idxs(valid_idx))(o)
@@ -157,7 +157,7 @@ def RandomSubsetSplitter(train_sz, valid_sz, seed=None):
     assert 0 < valid_sz < 1
     assert train_sz + valid_sz <= 1.
 
-    def _inner(o, **kwargs):
+    def _inner(o):
         if seed is not None: torch.manual_seed(seed)
         train_len,valid_len = int(len(o)*train_sz),int(len(o)*valid_sz)
         idxs = L(int(i) for i in torch.randperm(len(o)))
@@ -165,7 +165,7 @@ def RandomSubsetSplitter(train_sz, valid_sz, seed=None):
     return _inner
 
 # Cell
-def parent_label(o, **kwargs):
+def parent_label(o):
     "Label `item` with the parent folder name."
     return Path(o).parent.name
 
@@ -176,7 +176,7 @@ class RegexLabeller():
         self.pat = re.compile(pat)
         self.matcher = self.pat.match if match else self.pat.search
 
-    def __call__(self, o, **kwargs):
+    def __call__(self, o):
         res = self.matcher(str(o))
         assert res,f'Failed to find "{self.pat}" in "{o}"'
         return res.group(1)
@@ -184,6 +184,7 @@ class RegexLabeller():
 # Cell
 class ColReader():
     "Read `cols` in `row` with potential `pref` and `suff`"
+    store_attrs = 'cols'
     def __init__(self, cols, pref='', suff='', label_delim=None):
         store_attr(self, 'suff,label_delim')
         self.pref = str(pref) + os.path.sep if isinstance(pref, Path) else pref
@@ -195,9 +196,12 @@ class ColReader():
         if self.label_delim is None: return f'{self.pref}{o}{self.suff}'
         else: return o.split(self.label_delim) if len(o)>0 else []
 
-    def __call__(self, o, **kwargs):
+    def __call__(self, o):
         if len(self.cols) == 1: return self._do_one(o, self.cols[0])
         return L(self._do_one(o, c) for c in self.cols)
+
+    @property
+    def name(self): return f"ColReader -- {attrdict(self, *self.store_attrs.split(','))}"
 
 # Cell
 class CategoryMap(CollBase):
@@ -219,9 +223,9 @@ class CategoryMap(CollBase):
 # Cell
 class Categorize(Transform):
     "Reversible transform of category string to `vocab` id"
-    loss_func,order=CrossEntropyLossFlat(),1
+    loss_func,order,store_attrs=CrossEntropyLossFlat(),1,'vocab,add_na'
     def __init__(self, vocab=None, sort=True, add_na=False):
-        store_attr(self, 'add_na,sort')
+        store_attr(self, self.store_attrs+',sort')
         self.vocab = None if vocab is None else CategoryMap(vocab, sort=sort, add_na=add_na)
 
     def setups(self, dsets):
@@ -231,6 +235,9 @@ class Categorize(Transform):
     def encodes(self, o): return TensorCategory(self.vocab.o2i[o])
     def decodes(self, o): return Category      (self.vocab    [o])
 
+    @property
+    def name(self): return f"{super().name} -- {attrdict(self, *self.store_attrs.split(','))}"
+
 # Cell
 class Category(str, ShowTitle): _show_args = {'label': 'category'}
 
@@ -238,9 +245,7 @@ class Category(str, ShowTitle): _show_args = {'label': 'category'}
 class MultiCategorize(Categorize):
     "Reversible transform of multi-category strings to `vocab` id"
     loss_func,order=BCEWithLogitsLossFlat(),1
-    def __init__(self, vocab=None, add_na=False):
-        self.add_na = add_na
-        self.vocab = None if vocab is None else CategoryMap(vocab, add_na=add_na)
+    def __init__(self, vocab=None, add_na=False): super().__init__(vocab=vocab,add_na=add_na)
 
     def setups(self, dsets):
         if not dsets: return
@@ -260,8 +265,9 @@ class MultiCategory(L):
 # Cell
 class OneHotEncode(Transform):
     "One-hot encodes targets"
-    order=2
-    def __init__(self, c=None): self.c = c
+    order,store_attrs=2,'c'
+    def __init__(self, c=None):
+        self.c = c
 
     def setups(self, dsets):
         if self.c is None: self.c = len(L(getattr(dsets, 'vocab', None)))
@@ -270,25 +276,35 @@ class OneHotEncode(Transform):
     def encodes(self, o): return TensorMultiCategory(one_hot(o, self.c).float())
     def decodes(self, o): return one_hot_decode(o, None)
 
+    @property
+    def name(self): return f"{super().name} -- {attrdict(self, *self.store_attrs.split(','))}"
+
 # Cell
 class EncodedMultiCategorize(Categorize):
     "Transform of one-hot encoded multi-category that decodes with `vocab`"
     loss_func,order=BCEWithLogitsLossFlat(),1
-    def __init__(self, vocab): self.vocab,self.c = vocab,len(vocab)
+    def __init__(self, vocab):
+        super().__init__(vocab)
+        self.c = len(vocab)
     def encodes(self, o): return TensorMultiCategory(tensor(o).float())
     def decodes(self, o): return MultiCategory (one_hot_decode(o, self.vocab))
 
 # Cell
 class RegressionSetup(Transform):
     "Transform that floatifies targets"
-    loss_func=MSELossFlat()
-    def __init__(self, c=None): self.c = c
+    loss_func,store_attrs=MSELossFlat(),'c'
+    def __init__(self, c=None):
+        self.c = c
+
     def encodes(self, o): return tensor(o).float()
     def decodes(self, o): return TitledFloat(o) if o.ndim==0 else TitledTuple(o_.item() for o_ in o)
     def setups(self, dsets):
         if self.c is not None: return
         try: self.c = len(dsets[0]) if hasattr(dsets[0], '__len__') else 1
         except: self.c = 0
+
+    @property
+    def name(self): return f"{super().name} -- {attrdict(self, *self.store_attrs.split(','))}"
 
 # Cell
 def get_c(dls):
@@ -307,11 +323,15 @@ class ToTensor(Transform):
 # Cell
 class IntToFloatTensor(Transform):
     "Transform image to float tensor, optionally dividing by 255 (e.g. for images)."
-    order = 10 #Need to run after PIL transforms on the GPU
-    def __init__(self, div=255., div_mask=1): store_attr(self, 'div,div_mask')
+    order,store_attrs = 10,'div,div_mask' #Need to run after PIL transforms on the GPU
+    def __init__(self, div=255., div_mask=1):
+        store_attr(self, 'div,div_mask')
     def encodes(self, o:TensorImage): return o.float().div_(self.div)
     def encodes(self, o:TensorMask ): return o.long() // self.div_mask
     def decodes(self, o:TensorImage): return ((o.clamp(0., 1.) * self.div).long()) if self.div else o
+
+    @property
+    def name(self): return f"{super().name} -- {attrdict(self, *self.store_attrs.split(','))}"
 
 # Cell
 def broadcast_vec(dim, ndim, *t, cuda=True):
@@ -325,8 +345,9 @@ def broadcast_vec(dim, ndim, *t, cuda=True):
 @docs
 class Normalize(Transform):
     "Normalize/denorm batch of `TensorImage`"
-    parameters,order=L('mean', 'std'),99
-    def __init__(self, mean=None, std=None, axes=(0,2,3)): self.mean,self.std,self.axes = mean,std,axes
+    parameters,order,store_attrs=L('mean', 'std'),99, 'mean,std,axes'
+    def __init__(self, mean=None, std=None, axes=(0,2,3)):
+        self.mean,self.std,self.axes = mean,std,axes
 
     @classmethod
     def from_stats(cls, mean, std, dim=1, ndim=4, cuda=True): return cls(*broadcast_vec(dim, ndim, mean, std, cuda=cuda))
@@ -340,5 +361,8 @@ class Normalize(Transform):
     def decodes(self, x:TensorImage):
         f = to_cpu if x.device.type=='cpu' else noop
         return (x*f(self.std) + f(self.mean))
+
+    @property
+    def name(self): return f"{super().name} -- {attrdict(self, *self.store_attrs.split(','))}"
 
     _docs=dict(encodes="Normalize batch", decodes="Denormalize batch")

@@ -136,7 +136,7 @@ class Learner():
         assert hasattr(event, event_name)
         [cb(event_name) for cb in sort_by_run(self.cbs)]
 
-    def _bn_bias_state(self, with_bias): return bn_bias_params(self.model, with_bias).map(self.opt.state)
+    def _bn_bias_state(self, with_bias): return norm_bias_params(self.model, with_bias).map(self.opt.state)
     def create_opt(self):
         self.opt = self.opt_func(self.splitter(self.model), lr=self.lr)
         if not self.wd_bn_bias:
@@ -220,13 +220,13 @@ class Learner():
 
     @delegates(GatherPredsCallback.__init__)
     def get_preds(self, ds_idx=1, dl=None, with_input=False, with_decoded=False, with_loss=False, act=None,
-                  inner=False, reorder=True, **kwargs):
+                  inner=False, reorder=True, cbs=None, **kwargs):
         if dl is None: dl = self.dls[ds_idx].new(shuffled=False, drop_last=False)
         if reorder and hasattr(dl, 'get_idxs'):
             idxs = dl.get_idxs()
             dl = dl.new(get_idxs = _ConstantFunc(idxs))
         cb = GatherPredsCallback(with_input=with_input, with_loss=with_loss, **kwargs)
-        ctx_mgrs = [self.no_logging(), self.added_cbs(cb), self.no_mbar()]
+        ctx_mgrs = [self.no_logging(), self.added_cbs(L(cbs)+[cb]), self.no_mbar()]
         if with_loss: ctx_mgrs.append(self.loss_not_reduced())
         with ExitStack() as stack:
             for mgr in ctx_mgrs: stack.enter_context(mgr)
