@@ -787,6 +787,26 @@ index = {"subplots": "00_torch_core.ipynb",
          "CaptumInterpretation": "73_callback.captum.ipynb",
          "CaptumInterpretation.insights": "73_callback.captum.ipynb",
          "CutMix": "74_callback.cutmix.ipynb",
+         "open_npy": "80_vision.multichannel.ipynb",
+         "open_geotiff": "80_vision.multichannel.ipynb",
+         "MultiChannelTensorImage": "80_vision.multichannel.ipynb",
+         "show_composite": "80_vision.multichannel.ipynb",
+         "show_single_channel": "80_vision.multichannel.ipynb",
+         "show_normalized_spectral_index": "80_vision.multichannel.ipynb",
+         "show_mean_spectra": "80_vision.multichannel.ipynb",
+         "norm": "80_vision.multichannel.ipynb",
+         "MultiChannelTensorImage.create": "80_vision.multichannel.ipynb",
+         "MultiChannelImageBlock": "80_vision.multichannel.ipynb",
+         "using_attr": "80_vision.multichannel.ipynb",
+         "MultiChannelImageDataLoaders": "80_vision.multichannel.ipynb",
+         "MultiChannelImageDataLoaders.from_csv": "80_vision.multichannel.ipynb",
+         "MultiChannelImageDataLoaders.from_shapefile": "80_vision.multichannel.ipynb",
+         "MultiChannelImageDataLoaders.from_name_func": "80_vision.multichannel.ipynb",
+         "MultiChannelImageDataLoaders.from_path_re": "80_vision.multichannel.ipynb",
+         "MultiChannelImageDataLoaders.from_name_re": "80_vision.multichannel.ipynb",
+         "TifSegmentationDataLoaders": "80_vision.multichannel.ipynb",
+         "ScaleToFloatTensor": "80_vision.multichannel.ipynb",
+         "ToVolumetric": "80_vision.multichannel.ipynb",
          "synth_dbunch": "97_test_utils.ipynb",
          "RegModel": "97_test_utils.ipynb",
          "synth_learner": "97_test_utils.ipynb",
@@ -794,9 +814,6 @@ index = {"subplots": "00_torch_core.ipynb",
          "PYTORCH_URL": "99_pytorch_doc.ipynb",
          "pytorch_doc_link": "99_pytorch_doc.ipynb"}
 
-<<<<<<< HEAD
-modules = []
-=======
 modules = ["torch_core.py",
            "layers.py",
            "data/load.py",
@@ -846,9 +863,9 @@ modules = ["torch_core.py",
            "callback/neptune.py",
            "callback/captum.py",
            "callback/cutmix.py",
+           "vision/multichannel.py",
            "test_utils.py",
            "_pytorch_doc.py"]
->>>>>>> master
 
 doc_url = "https://dev.fast.ai/"
 
